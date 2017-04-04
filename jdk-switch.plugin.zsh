@@ -50,15 +50,37 @@ function _save_jdk_setting(){
 	fi
 }
 
-# check installed jdk
+# check installed jdk while current jdk status is unknown
+function _locate_installed_jdk(){
+	# for now only jdk 6,7 and 8 is mainly used
+	for (( i = ${MAXIMUM_JDK_VERSION}; i >= ${MINIUM_JDK_VERSION}; i-- )); do
+		local VERSION_CODE=1.${i}
+		# select an installed jdk as the default jdk
+		if [[ -d $(/usr/libexec/java_home -v ${VERSION_CODE}) ]]; then
+			_save_jdk_setting $VERSION_CODE
+			echo "JDK-SWITCH: JDK ${VERSION_CODE} found and will be applied as activating jdk."
+			echo "Reloading shell..."
+			break
+		elif [[ ${i} == ${MINIUM_JDK_VERSION} ]]; then
+			# i=6 indicate that no installed jdk matched
+			echo "JDK-SWITCH: It seems that this machine haven't installed any jdk yet."
+			return 1
+		fi
+	done
+}
 
 # applying jdk setting during shell initialization
 function _apply_jdk_setting(){
-	local JAVA_HOME_PATH=$(/usr/libexec/java_home -v ${JDK_STATUS})
-	if [[ -d $JAVA_HOME_PATH ]]; then
-		export JAVA_HOME=${JAVA_HOME_PATH}
-		export CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar:$JAVA_HOME/lib/dt.jar
-		export PATH=$JAVA_HOME/bin:$PATH
+	if [[ ${JDK_STATUS}'x' == 'x' ]]; then
+		_locate_installed_jdk
+		source ${HOME}/.zshrc
+	else
+		local JAVA_HOME_PATH=$(/usr/libexec/java_home -v ${JDK_STATUS})
+		if [[ -d $JAVA_HOME_PATH ]]; then
+			export JAVA_HOME=${JAVA_HOME_PATH}
+			export CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar:$JAVA_HOME/lib/dt.jar
+			export PATH=$JAVA_HOME/bin:$PATH
+		fi
 	fi
 }
 
