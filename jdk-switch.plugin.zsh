@@ -49,6 +49,9 @@ function _save_jdk_setting(){
 		echo "${Red}JDK home directory not found${NC}"
 	fi
 }
+
+# check installed jdk
+
 # applying jdk setting during shell initialization
 function _apply_jdk_setting(){
 	local JAVA_HOME_PATH=$(/usr/libexec/java_home -v ${JDK_STATUS})
@@ -62,26 +65,3 @@ function _apply_jdk_setting(){
 _apply_jdk_setting
 
 unset JDK_SWITCH_SCRIPT_PATH
-
-
-# export JAVA_6_HOME=$(/usr/libexec/java_home -v 1.6)
-# export JAVA_7_HOME=$(/usr/libexec/java_home -v 1.7)
-# export JAVA_8_HOME=$(/usr/libexec/java_home -v 1.8)
-# export JAVA_HOME=$JAVA_8_HOME
-# export CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar:$JAVA_HOME/lib/dt.jar:/Users/LockonStratos/CodeSketch/Library/crossroad-core
-# export PATH=$JAVA_HOME/bin:$PATH
-# function jdk6 {
-# 	export JAVA_HOME=$JAVA_6_HOME
-# 	export CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar:$JAVA_HOME/lib/dt.jar
-# 	export PATH=$JAVA_HOME/bin:$PATH
-# }
-# function jdk7 {
-# 	export JAVA_HOME=$JAVA_7_HOME
-# 	export CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar:$JAVA_HOME/lib/dt.jar
-# 	export PATH=$JAVA_HOME/bin:$PATH
-# }
-# function jdk8 {
-# 	export JAVA_HOME=$JAVA_8_HOME
-# 	export CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar:$JAVA_HOME/lib/dt.jar
-# 	export PATH=$JAVA_HOME/bin:$PATH
-# }
