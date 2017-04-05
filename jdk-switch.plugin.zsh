@@ -31,7 +31,7 @@ function jdkswitch(){
 # display jdk status
 function jdkstatus(){
 	if [[ $JDK_STATUS'x' == 'x' ]]; then
-		echo "${Red}JDK status UNKNOWN${NC}"
+		echo "\033[0;31mJDK status UNKNOWN\033[0m"
 	else
 		javac -version
 		java -version
@@ -46,7 +46,7 @@ function _save_jdk_setting(){
 		echo "JDK_STATUS=${VERSION_CODE}" > $JDK_STATUS_FILE
 		source ${HOME}/.zshrc
 	else
-		echo "${Red}JDK home directory not found${NC}"
+		echo "\033[0;31mJDK home directory not found\033[0m"
 	fi
 }
 
