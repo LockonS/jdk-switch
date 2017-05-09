@@ -51,7 +51,7 @@ function _save_jdk_setting(){
 }
 
 # check installed jdk while current jdk status is unknown
-function _locate_installed_jdk(){
+function _search_installed_jdk(){
 	# for now only jdk 6,7 and 8 is mainly used
 	for (( i = ${MAXIMUM_JDK_VERSION}; i >= ${MINIUM_JDK_VERSION}; i-- )); do
 		local VERSION_CODE=1.${i}
@@ -72,7 +72,7 @@ function _locate_installed_jdk(){
 # applying jdk setting during shell initialization
 function _apply_jdk_setting(){
 	if [[ ${JDK_STATUS}'x' == 'x' ]]; then
-		_locate_installed_jdk
+		_search_installed_jdk
 		source ${HOME}/.zshrc
 	else
 		local JAVA_HOME_PATH=$(/usr/libexec/java_home -v ${JDK_STATUS})
@@ -87,3 +87,5 @@ function _apply_jdk_setting(){
 _apply_jdk_setting
 
 unset JDK_SWITCH_SCRIPT_PATH
+unset STATUS_FILE_PATH
+unset JDK_STATUS_FILE
