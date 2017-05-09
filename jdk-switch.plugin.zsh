@@ -41,13 +41,20 @@ function jdkstatus(){
 # export jdk setting to file
 function _save_jdk_setting(){
 	local VERSION_CODE=${1}
-	local JAVA_HOME_PATH=$(/usr/libexec/java_home -v ${1})
+	local JAVA_HOME_PATH=$(/usr/libexec/java_home -v ${VERSION_CODE})
 	if [[ -d $JAVA_HOME_PATH ]]; then
 		echo "JDK_STATUS=${VERSION_CODE}" > $JDK_STATUS_FILE
+		if [[ -d $JAVA_HOME_PATH ]]; then
+			echo "JAVA_HOME=${JAVA_HOME_PATH}" >> $JDK_STATUS_FILE
+			echo "CLASSPATH=.:\$JAVA_HOME/lib/tools.jar:\$JAVA_HOME/lib/dt.jar" >> $JDK_STATUS_FILE
+			echo "PATH=\$JAVA_HOME/bin:\$PATH" >> $JDK_STATUS_FILE
+		fi
+		unset JAVA_HOME_PATH
 		source ${HOME}/.zshrc
 	else
 		echo "\033[0;31mJDK home directory not found\033[0m"
 	fi
+
 }
 
 # check installed jdk while current jdk status is unknown
@@ -74,13 +81,6 @@ function _apply_jdk_setting(){
 	if [[ ${JDK_STATUS}'x' == 'x' ]]; then
 		_search_installed_jdk
 		source ${HOME}/.zshrc
-	else
-		local JAVA_HOME_PATH=$(/usr/libexec/java_home -v ${JDK_STATUS})
-		if [[ -d $JAVA_HOME_PATH ]]; then
-			export JAVA_HOME=${JAVA_HOME_PATH}
-			export CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar:$JAVA_HOME/lib/dt.jar
-			export PATH=$JAVA_HOME/bin:$PATH
-		fi
 	fi
 }
 
