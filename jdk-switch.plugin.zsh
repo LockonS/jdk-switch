@@ -88,4 +88,3 @@ _apply_jdk_setting
 
 unset JDK_SWITCH_SCRIPT_PATH
 unset STATUS_FILE_PATH
-unset JDK_STATUS_FILE
