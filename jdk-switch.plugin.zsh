@@ -3,10 +3,6 @@ JDK_SWITCH_SCRIPT_PATH=$( cd `dirname $0` && pwd)
 STATUS_FILE_PATH=$JDK_SWITCH_SCRIPT_PATH/status
 JDK_STATUS_FILE="$STATUS_FILE_PATH/jdk_status"
 
-# configure the minimun and the maximum jdk version
-MINIUM_JDK_VERSION=6
-MAXIMUM_JDK_VERSION=8
-
 alias java_list='/usr/libexec/java_home -V'
 
 if [[ -f $JDK_STATUS_FILE ]]; then
@@ -19,10 +15,16 @@ else
 fi
 
 function jdkswitch(){
-	if [[ ${1} =~ ^[${MINIUM_JDK_VERSION}-${MAXIMUM_JDK_VERSION}]$ ]]; then
+	if [[ ${1} =~ ^[6-8]$ ]]; then
 		_save_jdk_setting "1.${1}"
-	elif [[ ${1} =~ ^1.[${MINIUM_JDK_VERSION}-${MAXIMUM_JDK_VERSION}]$ ]]; then
+	elif [[ "${1}x" == "9x" || "${1}x" == "10x" ]]; then
 		_save_jdk_setting ${1}
+	elif [[ ${1} =~ ^1.[6-8]$ ]]; then
+		_save_jdk_setting ${1}
+	elif [[ "${1}x" == "x" || "${1}x" == "hx" ||"${1}x" == "help" ]]; then
+		_jdk_switch_help_page
+	elif [[ "${1}x" == "sx" || "${1}x" == "statusx" ]]; then
+		jdkstatus
 	else
 		echo 'No JDK version matched'
 	fi
@@ -36,6 +38,14 @@ function jdkstatus(){
 		javac -version
 		java -version
 	fi
+}
+
+# display help page and info
+function _jdk_switch_help_page(){
+	echo "JDK version switch tool -- OSX Version"
+	echo "h/help 		Display this page"
+	echo "s/status  	Display current using version of JDK"
+	echo "JDK 1.6-1.8	Use \`jdkswitch 1.x\` or \`jdkswitch x\` \nJDK 9-10	Use \`jdkswitch x\`"
 }
 
 # export jdk setting to file
@@ -59,16 +69,21 @@ function _save_jdk_setting(){
 
 # check installed jdk while current jdk status is unknown
 function _search_installed_jdk(){
-	# for now only jdk 6,7 and 8 is mainly used
-	for (( i = ${MAXIMUM_JDK_VERSION}; i >= ${MINIUM_JDK_VERSION}; i-- )); do
+	for (( i = 10; i >= 6; i-- )); do
+
 		local VERSION_CODE=1.${i}
+		# jdk 9 and 10 require different format version code
+		if [[ ${i} -gt 8 ]]; then
+			VERSION_CODE=${i}
+		fi
+
 		# select an installed jdk as the default jdk
 		if [[ -d $(/usr/libexec/java_home -v ${VERSION_CODE}) ]]; then
 			_save_jdk_setting $VERSION_CODE
 			echo "JDK-SWITCH: JDK ${VERSION_CODE} found and will be applied as activating jdk."
 			echo "Reloading shell..."
 			break
-		elif [[ ${i} == ${MINIUM_JDK_VERSION} ]]; then
+		elif [[ ${i} == 6 ]]; then
 			# i=6 indicate that no installed jdk matched
 			echo "JDK-SWITCH: It seems that this machine haven't installed any jdk yet."
 			return 1
