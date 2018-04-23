@@ -21,7 +21,7 @@ function jdkswitch(){
 		_save_jdk_setting ${1}
 	elif [[ ${1} =~ ^1.[6-8]$ ]]; then
 		_save_jdk_setting ${1}
-	elif [[ "${1}x" == "x" || "${1}x" == "hx" ||"${1}x" == "help" ]]; then
+	elif [[ "${1}x" == "x" || "${1}x" == "hx" ||"${1}x" == "helpx" ]]; then
 		_jdk_switch_help_page
 	elif [[ "${1}x" == "sx" || "${1}x" == "statusx" ]]; then
 		jdkstatus
@@ -45,6 +45,8 @@ function _jdk_switch_help_page(){
 	echo "JDK version switch tool -- OSX Version"
 	echo "h/help 		Display this page"
 	echo "s/status  	Display current using version of JDK"
+	echo ""
+	echo "------Usage------"
 	echo "JDK 1.6-1.8	Use \`jdkswitch 1.x\` or \`jdkswitch x\` \nJDK 9-10	Use \`jdkswitch x\`"
 }
 
