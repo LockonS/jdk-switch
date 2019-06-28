@@ -17,7 +17,7 @@ fi
 function jdkswitch(){
 	if [[ ${1} =~ ^[6-8]$ ]]; then
 		_save_jdk_setting "1.${1}"
-	elif [[ "${1}x" == "9x" || "${1}x" == "10x" ]]; then
+	elif [[ "${1}x" == "9x" || "${1}x" == "10x" || "${1}x" == "11x" ]]; then
 		_save_jdk_setting ${1}
 	elif [[ ${1} =~ ^1.[6-8]$ ]]; then
 		_save_jdk_setting ${1}
@@ -47,7 +47,7 @@ function _jdk_switch_help_page(){
 	echo "s/status  	Display current using version of JDK"
 	echo ""
 	echo "------Usage------"
-	echo "JDK 1.6-1.8	Use \`jdkswitch 1.x\` or \`jdkswitch x\` \nJDK 9-10	Use \`jdkswitch x\`"
+	echo "JDK 1.6-1.8	Use \`jdkswitch 1.x\` or \`jdkswitch x\` \nJDK 9-11	Use \`jdkswitch x\`"
 }
 
 # export jdk setting to file
@@ -71,10 +71,10 @@ function _save_jdk_setting(){
 
 # check installed jdk while current jdk status is unknown
 function _search_installed_jdk(){
-	for (( i = 10; i >= 6; i-- )); do
+	for (( i = 11; i >= 6; i-- )); do
 
 		local VERSION_CODE=1.${i}
-		# jdk 9 and 10 require different format version code
+		# jdk 9 - 11 require different format version code
 		if [[ ${i} -gt 8 ]]; then
 			VERSION_CODE=${i}
 		fi
