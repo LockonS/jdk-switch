@@ -15,19 +15,14 @@ else
 fi
 
 function jdkswitch(){
-	if [[ ${1} =~ ^[6-8]$ ]]; then
-		_save_jdk_setting "1.${1}"
-	elif [[ "${1}x" == "9x" || "${1}x" == "10x" ]]; then
-		_save_jdk_setting ${1}
-	elif [[ ${1} =~ ^1.[6-8]$ ]]; then
-		_save_jdk_setting ${1}
-	elif [[ "${1}x" == "x" || "${1}x" == "hx" ||"${1}x" == "helpx" ]]; then
-		_jdk_switch_help_page
-	elif [[ "${1}x" == "sx" || "${1}x" == "statusx" ]]; then
-		jdkstatus
-	else
-		echo 'No JDK version matched'
-	fi
+	PARAM=$1
+	case $PARAM in
+		(s | status) jdkstatus ;;
+		(h | help) _jdk_switch_help_page ;;
+		(6 | 7 | 8) _save_jdk_setting "1.${1}";;
+		([0-9]*) _save_jdk_setting ${1};;
+		(*) echo 'No JDK version matched' ;;
+	esac
 }
 
 # display jdk status
@@ -47,7 +42,7 @@ function _jdk_switch_help_page(){
 	echo "s/status  	Display current using version of JDK"
 	echo ""
 	echo "------Usage------"
-	echo "JDK 1.6-1.8	Use \`jdkswitch 1.x\` or \`jdkswitch x\` \nJDK 9-10	Use \`jdkswitch x\`"
+	echo "JDK 1.6-1.8	Use \`jdkswitch 1.x\` or \`jdkswitch x\` \nJDK 9+	Use \`jdkswitch x\`"
 }
 
 # export jdk setting to file
@@ -62,7 +57,7 @@ function _save_jdk_setting(){
 			echo "PATH=\$JAVA_HOME/bin:\$PATH" >> $JDK_STATUS_FILE
 		fi
 		unset JAVA_HOME_PATH
-		source ${HOME}/.zshrc
+		source ${HOME}/.zshrc && java -version
 	else
 		echo "\033[0;31mJDK home directory not found\033[0m"
 	fi
