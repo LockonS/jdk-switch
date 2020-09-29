@@ -7,6 +7,7 @@ alias java_list='/usr/libexec/java_home -V'
 
 if [[ -f $JDK_STATUS_FILE ]]; then
 	source $JDK_STATUS_FILE
+	export JAVA_HOME=$JAVA_HOME
 else
 	if [[ ! -d $STATUS_FILE_PATH ]]; then
 		mkdir $STATUS_FILE_PATH
