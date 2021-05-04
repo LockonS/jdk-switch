@@ -53,7 +53,7 @@ function _save_jdk_setting(){
 	if [[ -d $JAVA_HOME_PATH ]]; then
 		echo "JDK_STATUS=${VERSION_CODE}" > $JDK_STATUS_FILE
 		if [[ -d $JAVA_HOME_PATH ]]; then
-			echo "JAVA_HOME=${JAVA_HOME_PATH}" >> $JDK_STATUS_FILE
+			echo "JAVA_HOME=\"${JAVA_HOME_PATH}\"" >> $JDK_STATUS_FILE
 			echo "CLASSPATH=.:\$JAVA_HOME/lib/tools.jar:\$JAVA_HOME/lib/dt.jar" >> $JDK_STATUS_FILE
 			echo "PATH=\$JAVA_HOME/bin:\$PATH" >> $JDK_STATUS_FILE
 		fi
