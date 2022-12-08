@@ -17,6 +17,10 @@ jdkswitch(){
 	esac
 }
 
+jdkswitch-enable(){
+	export PATH=$JAVA_HOME/bin:$PATH
+}
+
 # display jdk status
 jdkstatus(){
 	if [[ $JDK_STATUS'x' == 'x' ]]; then

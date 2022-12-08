@@ -5,19 +5,23 @@ A zsh plugin for quickly switching between different jdk versions, and the jdk s
 
 1. Clone this repository in oh-my-zsh's plugins directory
 	
-	```sh
-	git clone https://github.com/LockonS/jdk-switch.git $ZSH/custom/plugins/jdk-switch
+	```shell
+	$ git clone https://github.com/LockonS/jdk-switch.git $ZSH/custom/plugins/jdk-switch
 	```
 	
 2. Enable the plugin by adding `jdk-switch` in `plugins` in your `~/.zshrc`
 
-	```sh
+    > If you have some extra settings about `PATH` variable, you may need to add `jdkswitch-enable `in `~/.zshrc` to ensure `JAVA_HOME` was included in `PATH`.
+         
+	```shell
 	plugins=( [plugins...] jdk-switch)
+	# add an extra line jdkswitch-enable if needed
+	jdkswitch-enable
 	```
 	
 3. Usage
 	
-	```sh
+	```shell
 	# use jdkswitch to switch between different jdk versions
 	# switch to jdk 11
 	$ jdkswitch 11
