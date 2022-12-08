@@ -1,5 +1,5 @@
 ## jdk-switch
-A zsh plugin for quickly switching between different jdk versions, and the jdk status won't be restored after reloading the shell. **Please notice currently this plugin only works on macOS**. 
+A zsh plugin for quickly switching between different jdk versions, and the jdk status won't be restored after reloading the shell. **Now with support for Linux**. 
 
 ### Install
 
