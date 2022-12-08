@@ -19,10 +19,8 @@ A zsh plugin for quickly switching between different jdk versions, and the jdk s
 	
 	```sh
 	# use jdkswitch to switch between different jdk versions
-	# switch to jdk 8
-	$ jdkswitch 1.8
-	# or
-	$ jdkswitch 8
+	# switch to jdk 11
+	$ jdkswitch 11
 	
 	# check activating jdk
 	$ jdkstatus
