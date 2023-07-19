@@ -27,6 +27,7 @@ jdkstatus(){
 		echo "\033[0;31mJDK status UNKNOWN\033[0m"
 	else
 		echo "Java Home: $JAVA_HOME"
+		echo "Java Version:"
 		java -version
 	fi
 }
@@ -69,7 +70,7 @@ _jdk_switch_apply_setting(){
 	if [[ -n $INIT_MODE ]]; then
 		echo "JDK-SWITCH: JDK ${VERSION_CODE} found and will be activated.\nReloading shell..." 
 	fi
-	source ${HOME}/.zshrc && jdkstatus
+	exec zsh
 }
 
 _jdk_switch_macos_module(){
@@ -159,6 +160,10 @@ _jdk_switch_load_setting(){
 	if [[ -f $JDK_STATUS_FILE ]]; then
 		source $JDK_STATUS_FILE
 		export JAVA_HOME=$JAVA_HOME
+		# in case jdk was upgraded by other applications, e.g. homebrew
+		if [[ ! -d $JAVA_HOME ]]; then
+			unset JDK_STATUS
+		fi
 	else
 		[[ ! -d $JDK_STATUS_FILE_PATH ]] && mkdir $JDK_STATUS_FILE_PATH && touch $JDK_STATUS_FILE
 	fi
@@ -169,7 +174,7 @@ _jdk_switch_validate_setting(){
 	if [[ ${JDK_STATUS}'x' == 'x' ]]; then
 		_jdk_switch_search_default
 		# reload shell environment only if search operation is completed with success, prevent endless reloading
-		[[ $? -eq 0 ]] && source ${HOME}/.zshrc
+		[[ $? -eq 0 ]] && exec zsh
 	fi
 }
 
