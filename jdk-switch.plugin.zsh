@@ -70,6 +70,7 @@ _jdk_switch_apply_setting(){
 	if [[ -n $INIT_MODE ]]; then
 		echo "JDK-SWITCH: JDK ${VERSION_CODE} found and will be activated.\nReloading shell..." 
 	fi
+    $JAVA_HOME_PATH/bin/java -version
 	exec zsh
 }
 
