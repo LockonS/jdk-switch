@@ -13,8 +13,6 @@ _jdk_switch_load_env() {
   NC='\033[0m'
 
   JS_PLUGIN_NAME="JDK-SWITCH"
-  JS_MSG_NO_JDK_INSTALLED="${Red}${JS_PLUGIN_NAME}: No JDK found on this machine${NC}"
-  JS_MSG_JDK_STATUS_UNKNOWN="${Red}${JS_PLUGIN_NAME}: JDK status unknown${NC}"
 }
 
 jdk-switch() {
@@ -34,7 +32,7 @@ jdk-switch-enable() {
 # display jdk status
 jdk-status() {
   if [[ -z $JDK_STATUS ]]; then
-    echo -e "$JS_MSG_JDK_STATUS_UNKNOWN"
+    echo -e "${Red}${JS_PLUGIN_NAME}: JDK status unknown${NC}"
   else
     echo "JAVA_HOME: $JAVA_HOME"
     java -version
@@ -110,6 +108,10 @@ _jdk_switch_msg_switch_version() {
   echo -e "$JS_PLUGIN_NAME: Switch to jdk ${Blue}${VERSION_CODE}${NC}"
 }
 
+_jdk_switch_msg_no_jdk_installed() {
+  echo -e "${Red}${JS_PLUGIN_NAME}: No JDK found on this machine${NC}"
+}
+
 # validate saved setting in case of empty or corrupted, in that case search an installed jdk and set as default
 _jdk_switch_validate_config() {
   [[ -n $JDK_STATUS ]] && return 0
@@ -148,7 +150,7 @@ _jdk_switch_macos_module() {
     fi
 
     if [[ $BREW_JDK_EXIST == false ]] && [[ $MACOS_JDK_EXIST == false ]]; then
-      echo -e "$JS_MSG_NO_JDK_INSTALLED"
+      _jdk_switch_msg_no_jdk_installed
       return 1
     fi
   }
@@ -276,7 +278,7 @@ _jdk_switch_linux_module() {
     VERSION_CODE=${1}
 
     if [[ ! -d $LINUX_JDK_DIR ]] || [[ -z "$(ls -A $LINUX_JDK_DIR)" ]]; then
-      echo -e "$JS_MSG_NO_JDK_INSTALLED"
+      _jdk_switch_msg_no_jdk_installed
       return 1
     fi
 
@@ -299,7 +301,7 @@ _jdk_switch_linux_module() {
     local EXTRACT_VERSION_CODE
 
     if [[ ! -d $LINUX_JDK_DIR ]] || [[ -z "$(ls -A $LINUX_JDK_DIR)" ]]; then
-      echo -e "$JS_MSG_NO_JDK_INSTALLED"
+      _jdk_switch_msg_no_jdk_installed
       return 1
     fi
 
