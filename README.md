@@ -11,23 +11,23 @@ A zsh plugin for quickly switching between different jdk versions, and the jdk s
 	
 2. Enable the plugin by adding `jdk-switch` in `plugins` in your `~/.zshrc`
 
-    > If you have some extra settings about `PATH` variable, you may need to add `jdkswitch-enable `in `~/.zshrc` to ensure `JAVA_HOME` was included in `PATH`.
+    > If you have some extra settings about `PATH` variable, you may need to add `jdk-switch-enable `in `~/.zshrc` to ensure `JAVA_HOME` was included in `PATH`.
          
 	```shell
 	plugins=( [plugins...] jdk-switch)
-	# add an extra line jdkswitch-enable if needed
-	jdkswitch-enable
 	```
 	
 3. Usage
 	
 	```shell
-	# use jdkswitch to switch between different jdk versions
+	# use jdk-switch to switch between different jdk versions
 	# switch to jdk 11
-	$ jdkswitch 11
+	$ jdk-switch -v 11
+	# or (legacy support)
+	$ jdk-switch 11
 	
-	# check activating jdk
-	$ jdkstatus
+	# check activating jdk status
+	$ jdk-status
 	```
 	
 	
@@ -39,5 +39,5 @@ A zsh plugin for quickly switching between different jdk versions, and the jdk s
 	
 #### Known issues
 
-1. There is a flaw while running `/usr/libexec/java_home -v <version>` on MacOS to get `JAVA_HOME`, as this tool will return inaccurate result in some cases. For example, on a machine installed with JDK 11 and JDK 17, `/usr/libexec/java_home -v 12` will return the directory of JDK 17. As this plugin rely on `/usr/libexec/java_home`, execute `jdkswitch 12` will switch to JDK 17 instead rather than give an error. 
+1. There is a flaw while running `/usr/libexec/java_home -v <version>` on MacOS to get `JAVA_HOME`, as this tool will return inaccurate result in some cases. For example, on a machine installed with JDK 11 and JDK 17, `/usr/libexec/java_home -v 12` will return the directory of JDK 17. As this plugin rely on `/usr/libexec/java_home`, execute `jdk-switch 12` will switch to JDK 17 instead rather than give an error. 
 	
