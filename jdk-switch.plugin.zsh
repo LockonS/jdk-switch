@@ -9,16 +9,14 @@ _jdk_switch_load_env() {
   JDK_STATUS_FILE_PATH=$JDK_SWITCH_SCRIPT_PATH/status
   JDK_STATUS_FILE=$JDK_STATUS_FILE_PATH/jdk_status
 
-  Red='\033[0;31m'
-  Green='\033[0;32m'
-  Yellow='\033[0;33m'
+  Red='\033[1;31m'
   Blue='\033[1;34m'
   NC='\033[0m'
 
-  JSMSG_JDK_NOT_FOUND="${Red}JDK-SWITCH: JDK home directory not found${NC}"
-  JSMSG_NO_JDK_INSTALLED="${Red}JDK-SWITCH: No JDK found on this machine${NC}"
-  JSMSG_JDK_STATUS_UNKNOWN="${Red}JDK-SWITCH: JDK status unknown${NC}"
-  JSMSG_NO_JDK_MATCHED="${Red}JDK-SWITCH: No JDK version matched${NC}"
+  JS_PLUGIN_NAME="JDK-SWITCH"
+  JS_MSG_JDK_NOT_FOUND="${Red}${JS_PLUGIN_NAME}: JDK home directory not found${NC}"
+  JS_MSG_NO_JDK_INSTALLED="${Red}${JS_PLUGIN_NAME}: No JDK found on this machine${NC}"
+  JS_MSG_JDK_STATUS_UNKNOWN="${Red}${JS_PLUGIN_NAME}: JDK status unknown${NC}"
 }
 
 jdk-switch() {
@@ -26,9 +24,8 @@ jdk-switch() {
   case $PARAM in
     -s | --status) jdk-status ;;
     -h | --help) _jdk_switch_help_page ;;
-    [6-8]) _jdk_switch_switch_jdk "1.${1}" ;;
-    [0-9]*) _jdk_switch_switch_jdk "${1}" ;;
-    *) echo -e "$JSMSG_NO_JDK_MATCHED" && return 1 ;;
+    -v | --version) _jdk_switch_switch_jdk "${2}" ;;
+    *) _jdk_switch_switch_jdk "${1}" ;;
   esac
 }
 
@@ -39,7 +36,7 @@ jdk-switch-enable() {
 # display jdk status
 jdk-status() {
   if [[ -z $JDK_STATUS ]]; then
-    echo -e "$JSMSG_JDK_STATUS_UNKNOWN"
+    echo -e "$JS_MSG_JDK_STATUS_UNKNOWN"
   else
     echo "JAVA_HOME: $JAVA_HOME"
     java -version
@@ -49,9 +46,11 @@ jdk-status() {
 # display help page and info
 _jdk_switch_help_page() {
   echo -e "JDK-Switch Zsh Plugin\n"
-  echo "usage: jdk-switch -h/--help	Display this page"
-  echo "       jdk-switch -s/--status	Display current using version of JDK"
-  echo "       jdk-switch <x>      	Switch to JDK version"
+  echo "usage: jdk-switch [-s|--status][-v|--select-version version-code][-h|--help]"
+  echo "       -h,--help                  Display manual page"
+  echo "       -s,--status                Display activated jdk status"
+  echo "       -v,--select-version code   Switch to target jdk version"
+  echo "       code                       Switch to target jdk version, legacy support"
 }
 
 # load different function based on os type
@@ -83,7 +82,7 @@ _jdk_switch_apply_setting() {
   } >>"$JDK_STATUS_FILE"
 
   # print remind message if jdk was found and activated
-  [[ -n $INIT_MODE ]] && echo -e "JDK-SWITCH: Activate jdk ${Blue}${VERSION_CODE}${NC} as default jdk.\nReloading shell..."
+  [[ -n $INIT_MODE ]] && echo -e "$JS_PLUGIN_NAME: Activate jdk ${Blue}${VERSION_CODE}${NC} as default jdk.\nReloading shell..."
 
   # print jdk version and reload shell
   "$JAVA_HOME_PATH/bin/java" -version
@@ -121,13 +120,15 @@ _jdk_switch_macos_module() {
   _jdk_switch_switch_jdk() {
     local VERSION_CODE JAVA_HOME_PATH INIT_MODE
     VERSION_CODE=${1}
+    # jdk version code format changed before jdk 9 on MacOS platform
+    [[ $VERSION_CODE -lt 9 ]] && VERSION_CODE="1.${VERSION_CODE}"
     JAVA_HOME_PATH=$(/usr/libexec/java_home -v "$VERSION_CODE")
     INIT_MODE=${2}
     if [[ -d $JAVA_HOME_PATH ]]; then
       _jdk_switch_apply_setting "$VERSION_CODE" "$JAVA_HOME_PATH" "$INIT_MODE"
     else
       # show error message if not in init mode
-      [[ -z $INIT_MODE ]] && echo -e "$JSMSG_JDK_NOT_FOUND"
+      [[ -z $INIT_MODE ]] && echo -e "$JS_MSG_JDK_NOT_FOUND"
       return 1
     fi
   }
@@ -136,16 +137,14 @@ _jdk_switch_macos_module() {
   _jdk_switch_search_default() {
     local VERSION_CODE
     for ((i = LATEST_JDK_RELEASE; i >= 6; i--)); do
-      VERSION_CODE=1.${i}
-      # jdk version code changed after 1.8
-      [[ ${i} -gt 8 ]] && VERSION_CODE=${i}
+      VERSION_CODE=${i}
       # select an installed jdk as the default jdk
       if [[ -d $(/usr/libexec/java_home -v "$VERSION_CODE") ]]; then
         _jdk_switch_switch_jdk "$VERSION_CODE" true
         [[ $? -eq 0 ]] && break || continue
       elif [[ ${i} == 6 ]]; then
         # i=6 indicate that no installed jdk matched
-        echo -e "$JSMSG_NO_JDK_INSTALLED"
+        echo -e "$JS_MSG_NO_JDK_INSTALLED"
         return 1
       fi
     done
@@ -167,7 +166,7 @@ _jdk_switch_linux_module() {
     INIT_MODE=${2}
 
     if [[ ! "$(ls -A $LINUX_JVM_DIR)" ]]; then
-      echo -e "$JSMSG_NO_JDK_INSTALLED"
+      echo -e "$JS_MSG_NO_JDK_INSTALLED"
       return 1
     fi
 
@@ -183,10 +182,11 @@ _jdk_switch_linux_module() {
     done
 
     if [[ -d $JAVA_HOME_PATH ]]; then
+      echo -e "$JS_PLUGIN_NAME: Switch to jdk ${Blue}${VERSION_CODE}${NC}"
       _jdk_switch_apply_setting "$VERSION_CODE" "$JAVA_HOME_PATH" "$INIT_MODE"
     else
       # show error message if not in init mode
-      [[ -z $INIT_MODE ]] && echo -e "$JSMSG_JDK_NOT_FOUND"
+      echo -e "${Red}$JS_PLUGIN_NAME: Target version ${VERSION_CODE} not found ${NC}"
       return 1
     fi
   }
@@ -194,11 +194,12 @@ _jdk_switch_linux_module() {
   # search installed jdk and apply the first located one as default
   _jdk_switch_search_default() {
     if [[ ! -d $LINUX_JVM_DIR ]]; then
-      echo -e "$JSMSG_NO_JDK_INSTALLED"
+      echo -e "$JS_MSG_NO_JDK_INSTALLED"
       return 1
     fi
+
     if [[ ! "$(ls -A $LINUX_JVM_DIR)" ]]; then
-      echo -e "$JSMSG_NO_JDK_INSTALLED"
+      echo -e "$JS_MSG_NO_JDK_INSTALLED"
       return 1
     fi
 
