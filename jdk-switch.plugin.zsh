@@ -13,7 +13,6 @@ _jdk_switch_load_env() {
   NC='\033[0m'
 
   JS_PLUGIN_NAME="JDK-SWITCH"
-  JS_MSG_JDK_NOT_FOUND="${Red}${JS_PLUGIN_NAME}: JDK home directory not found${NC}"
   JS_MSG_NO_JDK_INSTALLED="${Red}${JS_PLUGIN_NAME}: No JDK found on this machine${NC}"
   JS_MSG_JDK_STATUS_UNKNOWN="${Red}${JS_PLUGIN_NAME}: JDK status unknown${NC}"
 }
