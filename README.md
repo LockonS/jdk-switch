@@ -26,6 +26,9 @@ A zsh plugin for quickly switching between different jdk versions, and the jdk s
 	# or (legacy support)
 	$ jdk-switch 11
 	
+	# use 6,7,8 for jdk before jdk9
+	$ jdk-switch -v 8
+	
 	# check activating jdk status
 	$ jdk-status
 	```
