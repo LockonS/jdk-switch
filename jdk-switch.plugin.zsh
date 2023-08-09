@@ -1,187 +1,331 @@
-JDK_SWITCH_SCRIPT_PATH=$( cd `dirname $0` && pwd)
-JDK_STATUS_FILE_PATH=$JDK_SWITCH_SCRIPT_PATH/status
-JDK_STATUS_FILE="$JDK_STATUS_FILE_PATH/jdk_status"
+# shellcheck disable=SC1090,SC2164,SC2143,SC2010
+JDK_SWITCH_SCRIPT_PATH=$(
+  cd "$(dirname "$0")"
+  pwd
+)
 
-JDK_SWITCH_MSG_JDK_NOT_FOUND="JDK-SWITCH: JDK home directory not found"
-JDK_SWITCH_MSG_NO_JDK_INSTALLED="JDK-SWITCH: No JDK found on this machine"
-LATEST_JDK_RELEASE=19
+_jdk_switch_load_env() {
+  JDK_STATUS_FILE_PATH=$JDK_SWITCH_SCRIPT_PATH/status
+  JDK_STATUS_FILE=$JDK_STATUS_FILE_PATH/jdk_status
 
-jdkswitch(){
-	PARAM=$1
-	case $PARAM in
-		(-s | --status) jdkstatus ;;
-		(-h | --help) _jdk_switch_help_page ;;
-		([6-8]) _jdk_switch_search_jdk "1.${1}";;
-		([0-9]*) _jdk_switch_search_jdk ${1};;
-		(*) echo 'No JDK version matched' ;;
-	esac
+  Red='\033[1;31m'
+  Blue='\033[1;34m'
+  NC='\033[0m'
+
+  JS_PLUGIN_NAME="JDK-SWITCH"
 }
 
-jdkswitch-enable(){
-	export PATH=$JAVA_HOME/bin:$PATH
+jdk-switch() {
+  local PARAM=$1
+  case $PARAM in
+    -s | --status) jdk-status ;;
+    -h | --help) _jdk_switch_help_page ;;
+    -v | --version) _jdk_switch_switch_jdk "${2}" ;;
+    *) _jdk_switch_switch_jdk "${1}" ;;
+  esac
+}
+
+jdk-switch-enable() {
+  export PATH=$JAVA_HOME/bin:$PATH
 }
 
 # display jdk status
-jdkstatus(){
-	if [[ $JDK_STATUS'x' == 'x' ]]; then
-		echo "\033[0;31mJDK status UNKNOWN\033[0m"
-	else
-		echo "Java Home: $JAVA_HOME"
-		echo "Java Version:"
-		java -version
-	fi
+jdk-status() {
+  if [[ -z $JDK_STATUS ]]; then
+    echo -e "${Red}${JS_PLUGIN_NAME}: JDK status unknown${NC}"
+  else
+    echo "JAVA_HOME: $JAVA_HOME"
+    java -version
+  fi
 }
 
 # display help page and info
-_jdk_switch_help_page(){
-	echo "JDK-Switch Zsh Plugin\n"
-	echo "usage: jdkswitch -h/--help	Display this page"
-	echo "       jdkswitch -s/--status	Display current using version of JDK"
-	echo "       jdkswitch <x>      	Switch to JDK version"
+_jdk_switch_help_page() {
+  echo -e "JDK-Switch Zsh Plugin\n"
+  echo "usage: jdk-switch [-s|--status][-v|--select-version version-code][-h|--help]"
+  echo "       -h,--help                  Display manual page"
+  echo "       -s,--status                Display activated jdk status"
+  echo "       -v,--select-version code   Switch to target jdk version"
+  echo "       code                       Switch to target jdk version, legacy support"
 }
 
 # load different function based on os type
-_jdk_switch_load_by_os(){
-	local OSNAME=$(uname -s | tr "[:lower:]" "[:upper:]")
-	if [[ $OSNAME == DARWIN* ]]; then
-		_jdk_switch_macos_module
-	elif [[ $OSNAME == LINUX* ]]; then
-		_jdk_switch_linux_module
-	else
-		echo "Unsupported OS, exiting"
-	fi
-    unset OSNAME
-}
-
-_jdk_switch_error(){
-	local MESSAGE=${1}
-	echo "\033[0;31m$MESSAGE\033[0m"
+_jdk_switch_load_by_os() {
+  local OSNAME
+  OSNAME=$(uname -s | tr "[:lower:]" "[:upper:]")
+  if [[ $OSNAME == DARWIN* ]]; then
+    _jdk_switch_macos_module
+  elif [[ $OSNAME == LINUX* ]]; then
+    _jdk_switch_linux_module
+  else
+    echo "Unsupported OS, exiting"
+  fi
 }
 
 # save setting to config file and apply setting by reloading shell environment
-_jdk_switch_apply_setting(){
-	local VERSION_CODE=${1}
-	local JAVA_HOME_PATH=${2}
-	local INIT_MODE=${3}
-	echo "JDK_STATUS=${VERSION_CODE}" > $JDK_STATUS_FILE
-	echo "JAVA_HOME=\"${JAVA_HOME_PATH}\"" >> $JDK_STATUS_FILE
-	echo "CLASSPATH=.:\$JAVA_HOME/lib/tools.jar:\$JAVA_HOME/lib/dt.jar" >> $JDK_STATUS_FILE
-	echo "PATH=\$JAVA_HOME/bin:\$PATH" >> $JDK_STATUS_FILE
-	if [[ -n $INIT_MODE ]]; then
-		echo "JDK-SWITCH: JDK ${VERSION_CODE} found and will be activated.\nReloading shell..." 
-	fi
-    $JAVA_HOME_PATH/bin/java -version
-	exec zsh
+_jdk_switch_apply_setting() {
+  local VERSION_CODE JAVA_HOME_PATH INIT_MODE
+  VERSION_CODE=${1}
+  JAVA_HOME_PATH=${2}
+  INIT_MODE=${3}
+
+  # save configuration to jdk config file
+  {
+    echo "JDK_STATUS=$VERSION_CODE"
+    echo "JAVA_HOME=$JAVA_HOME_PATH"
+    echo "CLASSPATH=.:\$JAVA_HOME/lib/tools.jar:\$JAVA_HOME/lib/dt.jar"
+    echo "PATH=\$JAVA_HOME/bin:\$PATH"
+  } >>"$JDK_STATUS_FILE"
+
+  # print remind message if jdk was found and activated
+  [[ -n $INIT_MODE ]] && echo -e "$JS_PLUGIN_NAME: Activate jdk ${Blue}${VERSION_CODE}${NC} as default jdk.\nReloading shell..."
+
+  # print jdk version and reload shell
+  "$JAVA_HOME_PATH/bin/java" -version
+  exec zsh
 }
-
-_jdk_switch_macos_module(){
-	# search for jdk with designated version code
-	_jdk_switch_search_jdk(){
-		local VERSION_CODE=${1}
-		local JAVA_HOME_PATH=$(/usr/libexec/java_home -v ${VERSION_CODE})
-		local INIT_MODE=${2}
-		if [[ -d $JAVA_HOME_PATH ]]; then
-			_jdk_switch_apply_setting $VERSION_CODE $JAVA_HOME_PATH $INIT_MODE
-		else
-			# show error message if not in init mode
-			[[ ! -n $INIT_MODE ]] && _jdk_switch_error $JDK_SWITCH_MSG_JDK_NOT_FOUND
-			return 1
-		fi
-	}
-	# search installed jdk and apply the first located one as default
-	_jdk_switch_search_default(){
-		for (( i = $LATEST_JDK_RELEASE; i >= 6; i-- )); do
-			local VERSION_CODE=1.${i}
-			# jdk version code changed after 1.8
-			[[ ${i} -gt 8 ]] && VERSION_CODE=${i}			
-			# select an installed jdk as the default jdk
-			if [[ -d $(/usr/libexec/java_home -v ${VERSION_CODE}) ]]; then
-				_jdk_switch_search_jdk $VERSION_CODE true
-				[[ $? -eq 0 ]] && break || continue
-			elif [[ ${i} == 6 ]]; then
-				# i=6 indicate that no installed jdk matched
-				_jdk_switch_error $JDK_SWITCH_MSG_NO_JDK_INSTALLED
-				return 1
-			fi
-		done
-	}
-}
-
-_jdk_switch_linux_module(){
-	LINUX_JVM_DIR="/usr/lib/jvm"
-	# search for jdk with designated version code
-	_jdk_switch_search_jdk(){
-		local VERSION_CODE=${1}
-		local INIT_MODE=${2}
-		local JAVA_HOME_PATH
-
-		for JDK_ENTRY in $LINUX_JVM_DIR/*; do
-			if [[ ! -L $JDK_ENTRY ]] && [[ -f "$JDK_ENTRY/bin/java" ]]; then
-				# compare version code extract from jdk directory
-				ENTRY_VERSION_CODE=$(_jdk_switch_extract_version_code $JDK_ENTRY)
-				if [[ $ENTRY_VERSION_CODE == $VERSION_CODE ]]; then
-					JAVA_HOME_PATH=$JDK_ENTRY
-					break
-				fi
-			fi
-		done
-
-		if [[ -d $JAVA_HOME_PATH ]]; then
-			_jdk_switch_apply_setting $VERSION_CODE $JAVA_HOME_PATH $INIT_MODE
-		else
-			# show error message if not in init mode
-			[[ ! -n $INIT_MODE ]] && _jdk_switch_error $JDK_SWITCH_MSG_JDK_NOT_FOUND
-			return 1
-		fi
-	}
-	# search installed jdk and apply the first located one as default
-	_jdk_switch_search_default(){
-		if [[ ! "$(ls -A $LINUX_JVM_DIR)" ]]; then
-			_jdk_switch_error $JDK_SWITCH_MSG_NO_JDK_INSTALLED
-			return 1
-		fi
-		for JDK_ENTRY in $LINUX_JVM_DIR/*; do
-			if [[ ! -L $JDK_ENTRY ]] && [[ -f "$JDK_ENTRY/bin/java" ]]; then
-				VERSION_CODE=$(_jdk_switch_extract_version_code $JDK_ENTRY)
-				_jdk_switch_apply_setting $VERSION_CODE $JDK_ENTRY true
-				break
-			fi
-		done
-	}
-}
-
-_jdk_switch_extract_version_code(){
-	local JDK_HOME=${1}
-	basename $JDK_HOME | sed 's/jdk-\|java-\|-openjdk-[a-zA-Z0-9_\.\-]*//g'
-}
-
 
 # load saved setting
-_jdk_switch_load_setting(){
-	if [[ -f $JDK_STATUS_FILE ]]; then
-		source $JDK_STATUS_FILE
-		export JAVA_HOME=$JAVA_HOME
-		# in case jdk was upgraded by other applications, e.g. homebrew
-		if [[ ! -d $JAVA_HOME ]]; then
-			unset JDK_STATUS
-		fi
-	else
-		[[ ! -d $JDK_STATUS_FILE_PATH ]] && mkdir $JDK_STATUS_FILE_PATH && touch $JDK_STATUS_FILE
-	fi
+_jdk_switch_load_config() {
+  # create status file and directory if not exist
+  [[ ! -d "$JDK_STATUS_FILE_PATH" ]] && mkdir "$JDK_STATUS_FILE_PATH"
+  [[ ! -f "$JDK_STATUS_FILE" ]] && touch "$JDK_STATUS_FILE"
+
+  # apply environment variable in JDK_STATUS_FILE
+  source "$JDK_STATUS_FILE" && export JAVA_HOME
+
+  # in case jdk was upgraded by other applications, e.g. homebrew
+  [[ ! -d $JAVA_HOME ]] && unset JDK_STATUS
 }
 
-# validate saved setting in case of empty or corrupted, in that case search an installed jdk and set as default 
-_jdk_switch_validate_setting(){
-	if [[ ${JDK_STATUS}'x' == 'x' ]]; then
-		_jdk_switch_search_default
-		# reload shell environment only if search operation is completed with success, prevent endless reloading
-		[[ $? -eq 0 ]] && exec zsh
-	fi
+_jdk_switch_msg_no_target_version() {
+  local VERSION_CODE=${1}
+  echo -e "${Red}$JS_PLUGIN_NAME: Target version ${VERSION_CODE} not found ${NC}"
 }
 
+_jdk_switch_msg_switch_version() {
+  local VERSION_CODE=${1}
+  echo -e "$JS_PLUGIN_NAME: Switch to jdk ${Blue}${VERSION_CODE}${NC}"
+}
+
+_jdk_switch_msg_no_jdk_installed() {
+  echo -e "${Red}${JS_PLUGIN_NAME}: No JDK found on this machine${NC}"
+}
+
+# validate saved setting in case of empty or corrupted, in that case search an installed jdk and set as default
+_jdk_switch_validate_config() {
+  [[ -n $JDK_STATUS ]] && return 0
+
+  # reload environment only if search operation complete with success
+  if _jdk_switch_search_default; then
+    exec zsh
+  fi
+}
+
+# extract version code from jdk home directory
+_jdk_switch_extract_version_code() {
+  basename "${1}" | sed 's/jdk\|jdk-\|java-\|openjdk\|openjdk-\|\.jdk\|-openjdk-[a-zA-Z0-9_\.\-]*//g'
+}
+
+_jdk_switch_macos_module() {
+  MACOS_JDK_DIR=/Library/Java/JavaVirtualMachines
+  BREW_EXECUTABLE=brew
+
+  _jdk_switch_if_no_jdk_installed() {
+    local BREW_JDK_EXIST MACOS_JDK_EXIST
+    BREW_JDK_EXIST=false
+    MACOS_JDK_EXIST=false
+
+    # if homebrew is installed, check jdk installed by homebrew
+    if command -v $BREW_EXECUTABLE &>/dev/null; then
+      BREW_CELLAR="$(brew --prefix)"/Cellar
+      if [[ -n "$(ls "$BREW_CELLAR" | grep 'jdk')" ]]; then
+        BREW_JDK_EXIST=true
+      fi
+    fi
+
+    # check if MacOS default jdk directory exist and have jdk installed
+    if [[ -d $MACOS_JDK_DIR ]] && [[ -n "$(ls "$MACOS_JDK_DIR")" ]]; then
+      MACOS_JDK_EXIST=true
+    fi
+
+    if [[ $BREW_JDK_EXIST == false ]] && [[ $MACOS_JDK_EXIST == false ]]; then
+      _jdk_switch_msg_no_jdk_installed
+      return 1
+    fi
+  }
+
+  # traverse all installed jdk to find a target jdk
+  _jdk_switch_traverse_jdk() {
+    # search jdk installed by homebrew first
+    if [[ -n "$BREW_CELLAR" ]] && [[ -n "$(ls "$BREW_CELLAR" | grep 'jdk')" ]]; then
+      # traverse homebrew jdk list
+      for JDK_ENTRY in "$BREW_CELLAR"/*jdk*; do
+        # incase no version exist in the direcotry
+        [[ -z "$(ls "$JDK_ENTRY")" ]] && continue
+        # multiple version might co-exist in the directory
+        for JDK_VERSION in "$JDK_ENTRY"/*; do
+          if [[ -f "$JDK_VERSION/bin/java" ]]; then
+            EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_VERSION")
+            MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f1)
+            if [[ -z $VERSION_CODE ]]; then
+              # if version code not provided, select first version and set JAVA_HOME_PATH
+              JAVA_HOME_PATH=$JDK_VERSION
+              break
+            else
+              # if version code provided, select first matched version and set JAVA_HOME_PATH
+              # need some special treatment for jdk before 9
+              [[ $VERSION_CODE -lt 9 ]] && MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f2)
+              if [[ $MAJOR_VERSION == "$VERSION_CODE" ]]; then
+                JAVA_HOME_PATH=$JDK_VERSION
+                break
+              fi
+            fi
+          fi
+        done
+      done
+    fi
+
+    # if no homebrew jdk found or homebrew not installed, seacrh in MacOS default jdk directory
+    if [[ -z "$JAVA_HOME_PATH" ]]; then
+      for JDK_ENTRY in "$MACOS_JDK_DIR"/*; do
+        if [[ -f "$JDK_ENTRY/Contents/Home/bin/java" ]]; then
+          # compare version code extract from jdk directory
+          EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_ENTRY")
+          MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f1)
+          if [[ -z $VERSION_CODE ]]; then
+            # if version code not provided, select first version and set JAVA_HOME_PATH
+            JAVA_HOME_PATH=$JDK_ENTRY/Contents/Home
+            break
+          else
+            # if version code provided, select first matched version and set JAVA_HOME_PATH
+            # need some special treatment for jdk before 9
+            [[ $VERSION_CODE -lt 9 ]] && MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f2)
+            if [[ $MAJOR_VERSION == "$VERSION_CODE" ]]; then
+              JAVA_HOME_PATH=$JDK_ENTRY/Contents/Home
+              break
+            fi
+          fi
+        fi
+      done
+    fi
+  }
+
+  # search for jdk with designated version code
+  _jdk_switch_switch_jdk() {
+    local VERSION_CODE JAVA_HOME_PATH EXTRACT_VERSION_CODE MAJOR_VERSION
+    VERSION_CODE=${1}
+
+    # check jdk directory incase no jdk is installed
+    _jdk_switch_if_no_jdk_installed || return 1
+
+    # traverse all jdk to select a target jdk
+    _jdk_switch_traverse_jdk "$VERSION_CODE"
+
+    if [[ -n $JAVA_HOME_PATH ]]; then
+      _jdk_switch_msg_switch_version "$VERSION_CODE"
+      _jdk_switch_apply_setting "$VERSION_CODE" "$JAVA_HOME_PATH"
+    else
+      # show error message if not in init mode
+      _jdk_switch_msg_no_target_version "$VERSION_CODE"
+      return 1
+    fi
+  }
+
+  # search installed jdk and apply the first located one as default
+  _jdk_switch_search_default() {
+    # check jdk directory incase no jdk is installed
+    _jdk_switch_if_no_jdk_installed || return 1
+
+    # traverse all jdk to select a target jdk
+    _jdk_switch_traverse_jdk "$VERSION_CODE"
+
+    # if a default jdk is selected
+    if [[ -n $JAVA_HOME_PATH ]]; then
+      _jdk_switch_apply_setting "$MAJOR_VERSION" "$JAVA_HOME_PATH" true
+    fi
+
+  }
+}
+
+_jdk_switch_linux_module() {
+  LINUX_JDK_DIR="/usr/lib/jvm"
+
+  # traverse all installed jdk to find a target jdk
+  _jdk_switch_traverse_jdk() {
+    local VERSION_CODE=${1}
+    for JDK_ENTRY in "$LINUX_JDK_DIR"/*; do
+      if [[ ! -L $JDK_ENTRY ]] && [[ -f "$JDK_ENTRY/bin/java" ]]; then
+        EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_ENTRY")
+        if [[ -z $VERSION_CODE ]]; then
+          # if version code not provided, select first version and set JAVA_HOME_PATH
+          JAVA_HOME_PATH=$JDK_ENTRY
+          break
+        else
+          # if version code provided, select first matched version and set JAVA_HOME_PATH
+          if [[ $EXTRACT_VERSION_CODE == "$VERSION_CODE" ]]; then
+            JAVA_HOME_PATH=$JDK_ENTRY
+            break
+          fi
+        fi
+      fi
+    done
+  }
+
+  # search for jdk with designated version code
+  _jdk_switch_switch_jdk() {
+    local VERSION_CODE JAVA_HOME_PATH EXTRACT_VERSION_CODE
+    VERSION_CODE=${1}
+
+    if [[ ! -d $LINUX_JDK_DIR ]] || [[ -z "$(ls -A $LINUX_JDK_DIR)" ]]; then
+      _jdk_switch_msg_no_jdk_installed
+      return 1
+    fi
+
+    # traverse all jdk to select a target jdk
+    _jdk_switch_traverse_jdk "$VERSION_CODE"
+
+    # if a target jdk is matched
+    if [[ -n $JAVA_HOME_PATH ]]; then
+      _jdk_switch_msg_switch_version "$VERSION_CODE"
+      _jdk_switch_apply_setting "$VERSION_CODE" "$JAVA_HOME_PATH"
+    else
+      # show error message if no matched version found
+      _jdk_switch_msg_no_target_version "$VERSION_CODE"
+      return 1
+    fi
+  }
+
+  # search installed jdk and apply the first located one as default
+  _jdk_switch_search_default() {
+    local EXTRACT_VERSION_CODE
+
+    if [[ ! -d $LINUX_JDK_DIR ]] || [[ -z "$(ls -A $LINUX_JDK_DIR)" ]]; then
+      _jdk_switch_msg_no_jdk_installed
+      return 1
+    fi
+
+    # traverse all jdk to select a default jdk
+    _jdk_switch_traverse_jdk
+
+    # if a default jdk is selected
+    if [[ -n $JAVA_HOME_PATH ]]; then
+      _jdk_switch_apply_setting "$EXTRACT_VERSION_CODE" "$JAVA_HOME_PATH" true
+    fi
+
+  }
+
+}
+
+alias jdkswitch='jdk-switch'
+alias jdkstatus='jdk-status'
+
+_jdk_switch_load_env
 _jdk_switch_load_by_os
-_jdk_switch_load_setting
-_jdk_switch_validate_setting
+_jdk_switch_load_config
+_jdk_switch_validate_config
 
 unset JDK_SWITCH_SCRIPT_PATH
 unset JDK_STATUS_FILE_PATH
+unfunction _jdk_switch_load_env
+unfunction _jdk_switch_load_by_os
