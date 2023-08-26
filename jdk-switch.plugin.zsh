@@ -94,8 +94,11 @@ _jdk_switch_load_config() {
   # apply environment variable in JDK_STATUS_FILE
   source "$JDK_STATUS_FILE" && export JAVA_HOME
 
-  # in case jdk was upgraded by other applications, e.g. homebrew
-  [[ ! -d $JAVA_HOME ]] && unset JDK_STATUS
+  # in case jdk was upgraded by other applications with minor version upgrade, e.g. homebrew
+  if [[ ! -d $JAVA_HOME ]]; then
+    JDK_PREVIOUS_VERSION=$JDK_STATUS
+    unset JDK_STATUS
+  fi
 }
 
 _jdk_switch_msg_no_target_version() {
@@ -116,10 +119,14 @@ _jdk_switch_msg_no_jdk_installed() {
 _jdk_switch_validate_config() {
   [[ -n $JDK_STATUS ]] && return 0
 
-  # reload environment only if search operation complete with success
-  if _jdk_switch_search_default; then
-    exec zsh
+  # if jdk was upgraded in minor version, use previous version to inherit the major version
+  if [[ -n $JDK_PREVIOUS_VERSION ]]; then
+    # if the major version exist, exit the process with success, else search and apply the default jdk
+    _jdk_switch_switch_jdk "$JDK_PREVIOUS_VERSION" && return 0
   fi
+
+  # reload environment only if search operation complete with success
+  _jdk_switch_search_default && exec zsh
 }
 
 # extract version code from jdk home directory
