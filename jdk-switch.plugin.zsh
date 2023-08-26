@@ -75,7 +75,7 @@ _jdk_switch_apply_setting() {
     echo "JAVA_HOME=$JAVA_HOME_PATH"
     echo "CLASSPATH=.:\$JAVA_HOME/lib/tools.jar:\$JAVA_HOME/lib/dt.jar"
     echo "PATH=\$JAVA_HOME/bin:\$PATH"
-  } >>"$JDK_STATUS_FILE"
+  } >"$JDK_STATUS_FILE"
 
   # print remind message if jdk was found and activated
   [[ -n $INIT_MODE ]] && echo -e "$JS_PLUGIN_NAME: Activate jdk ${Blue}${VERSION_CODE}${NC} as default jdk.\nReloading shell..."
