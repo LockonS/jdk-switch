@@ -54,7 +54,6 @@ _jdk_switch_help_page() {
 
 # load different function based on os type
 _jdk_switch_load_by_os() {
-  local OSNAME
   OSNAME=$(uname -s | tr "[:lower:]" "[:upper:]")
   if [[ $OSNAME == DARWIN* ]]; then
     _jdk_switch_macos_module
@@ -93,7 +92,7 @@ _jdk_switch_load_config() {
   [[ ! -d "$JDK_STATUS_FILE_PATH" ]] && mkdir "$JDK_STATUS_FILE_PATH"
   if [[ ! -f "$JDK_STATUS_FILE" ]]; then
     touch "$JDK_STATUS_FILE"
-    _jdk_switch_scan
+    [[ $OSNAME == DARWIN* ]] && _jdk_switch_scan
   fi
 
   # apply environment variable in JDK_STATUS_FILE
