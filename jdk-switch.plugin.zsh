@@ -21,7 +21,8 @@ jdk-switch() {
   case $PARAM in
     -s | --status) jdk-status ;;
     -h | --help) _jdk_switch_help_page ;;
-    -v | --version) _jdk_switch_switch_jdk "${2}" ;;
+    -v | --switch-version) _jdk_switch_switch_jdk "${2}" ;;
+    -c | --scan | scan) _jdk_switch_scan ;;
     *) _jdk_switch_switch_jdk "${1}" ;;
   esac
 }
@@ -43,10 +44,11 @@ jdk-status() {
 # display help page and info
 _jdk_switch_help_page() {
   echo -e "JDK-Switch Zsh Plugin\n"
-  echo "usage: jdk-switch [-s|--status][-v|--select-version version-code][-h|--help]"
+  echo "usage: jdk-switch [-s|--status][-v|--switch-version code][-c|--scan|scan][-h|--help]"
   echo "       -h,--help                  Display manual page"
   echo "       -s,--status                Display activated jdk status"
-  echo "       -v,--select-version code   Switch to target jdk version"
+  echo "       -v,--switch-version code   Switch to target jdk version"
+  echo "       -c,--scan,scan             Scan homebrew installed jdk and create symbolic links for MacOS"
   echo "       code                       Switch to target jdk version, legacy support"
 }
 
@@ -74,7 +76,6 @@ _jdk_switch_apply_setting() {
   {
     echo "JDK_STATUS=$VERSION_CODE"
     echo "JAVA_HOME=$JAVA_HOME_PATH"
-    echo "CLASSPATH=.:\$JAVA_HOME/lib/tools.jar:\$JAVA_HOME/lib/dt.jar"
     echo "PATH=\$JAVA_HOME/bin:\$PATH"
   } >"$JDK_STATUS_FILE"
 
@@ -90,7 +91,10 @@ _jdk_switch_apply_setting() {
 _jdk_switch_load_config() {
   # create status file and directory if not exist
   [[ ! -d "$JDK_STATUS_FILE_PATH" ]] && mkdir "$JDK_STATUS_FILE_PATH"
-  [[ ! -f "$JDK_STATUS_FILE" ]] && touch "$JDK_STATUS_FILE"
+  if [[ ! -f "$JDK_STATUS_FILE" ]]; then
+    touch "$JDK_STATUS_FILE"
+    _jdk_switch_scan
+  fi
 
   # apply environment variable in JDK_STATUS_FILE
   source "$JDK_STATUS_FILE" && export JAVA_HOME
@@ -159,12 +163,17 @@ _jdk_switch_macos_module() {
     if command -v $BREW_EXECUTABLE &>/dev/null; then
       BREW_OPT_DIR="$(brew --prefix)"/opt
       if [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
-        for JDK_ENTRY in "$BREW_OPT_DIR"/*jdk*; do
+        echo -e "$JS_PLUGIN_NAME: Scanning brew installed jdk"
+        # traverse all brew installed jdk and create symbolic link if not created
+        for JDK_ENTRY in "$BREW_OPT_DIR"/*jdk@*; do
           JDK_ENTRY_NAME=$(basename "$JDK_ENTRY")
           JDK_LINK=$MACOS_JDK_DIR/$JDK_ENTRY_NAME
+          JDK_ENTRY_HOME=$JDK_ENTRY/libexec/openjdk.jdk/Contents/Home
           if [[ ! -L $JDK_LINK ]]; then
-            echo -e "$JS_PLUGIN_NAME: Creating symbolic link from [${Green}$JDK_ENTRY${NC}] to [${Green}$JDK_LINK${NC}]"
-            sudo ln -s "$JDK_ENTRY" "$JDK_LINK"
+            echo -e "$JS_PLUGIN_NAME: Creating symbolic link from [${Green}$JDK_ENTRY_HOME${NC}] to [${Green}$JDK_LINK${NC}]"
+            sudo ln -s "$JDK_ENTRY_HOME" "$JDK_LINK"
+          else
+            echo -e "$JS_PLUGIN_NAME: Symbolic link [${Green}$JDK_LINK${NC}] already exist"
           fi
         done
       fi
@@ -202,10 +211,10 @@ _jdk_switch_macos_module() {
     # search jdk installed by homebrew first
     if [[ -n "$BREW_OPT_DIR" ]] && [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
       # traverse homebrew jdk list
-      for JDK_ENTRY in "$BREW_OPT_DIR"/*jdk*; do
+      for JDK_ENTRY in "$BREW_OPT_DIR"/*jdk@*; do
         # incase no version exist in the direcotry
         [[ -z "$(ls "$JDK_ENTRY")" ]] && continue
-        # multiple version might co-exist in the directory
+        # check if directory is a valid jdk directory
         JDK_ENTRY_HOME=$JDK_ENTRY/libexec/openjdk.jdk/Contents/Home
         if [[ -f "$JDK_ENTRY_HOME/bin/java" ]]; then
           EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_ENTRY")
@@ -230,9 +239,9 @@ _jdk_switch_macos_module() {
         JDK_ENTRY_NAME=$(basename "$JDK_ENTRY")
         JDK_LINK=$MACOS_JDK_DIR/$JDK_ENTRY_NAME
         if [[ ! -L "$JDK_LINK" ]]; then
-          echo -e "$JS_PLUGIN_NAME: Creating symbolic link from [${Green}$JDK_ENTRY${NC}] to [${Green}$JDK_LINK${NC}]"
+          echo -e "$JS_PLUGIN_NAME: Creating symbolic link for [${Green}$JAVA_HOME_PATH${NC}] at [${Green}$JDK_LINK${NC}]"
           echo -e "$JS_PLUGIN_NAME: This operation need system admin permission"
-          sudo ln -s "$JDK_ENTRY" "$JDK_LINK"
+          sudo ln -s "$JAVA_HOME_PATH" "$JDK_LINK"
         fi
       fi
     fi
@@ -240,6 +249,9 @@ _jdk_switch_macos_module() {
     # if no homebrew jdk found or homebrew not installed, seacrh in MacOS default jdk directory
     if [[ -z "$JAVA_HOME_PATH" ]]; then
       for JDK_ENTRY in "$MACOS_JDK_DIR"/*; do
+        # ignore symbolic link
+        [[ -L $JDK_ENTRY ]] && continue
+        # check if directory is a valid jdk directory
         JDK_ENTRY_HOME=$JDK_ENTRY/Contents/Home
         if [[ -f "$JDK_ENTRY_HOME/bin/java" ]]; then
           # compare version code extract from jdk directory
@@ -306,6 +318,10 @@ _jdk_switch_linux_module() {
   # extract version code from jdk home directory
   _jdk_switch_extract_version_code() {
     basename "${1}" | sed 's/jdk\|jdk-\|java-\|openjdk\|openjdk-\|openjdk@\|\.jdk\|-openjdk-[a-zA-Z0-9_\.\-]*//g'
+  }
+
+  _jdk_switch_scan() {
+    echo -e "$JS_PLUGIN_NAME: This utility is MacOS exclusive."
   }
 
   # traverse all installed jdk to find a target jdk
