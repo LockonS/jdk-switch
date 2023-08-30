@@ -10,6 +10,7 @@ _jdk_switch_load_env() {
 
   Red='\033[1;31m'
   Blue='\033[1;34m'
+  Green='\033[1;32m'
   NC='\033[0m'
 
   JS_PLUGIN_NAME="JDK-SWITCH"
@@ -20,7 +21,8 @@ jdk-switch() {
   case $PARAM in
     -s | --status) jdk-status ;;
     -h | --help) _jdk_switch_help_page ;;
-    -v | --version) _jdk_switch_switch_jdk "${2}" ;;
+    -v | --switch-version) _jdk_switch_switch_jdk "${2}" ;;
+    -c | --scan | scan) _jdk_switch_scan ;;
     *) _jdk_switch_switch_jdk "${1}" ;;
   esac
 }
@@ -42,10 +44,11 @@ jdk-status() {
 # display help page and info
 _jdk_switch_help_page() {
   echo -e "JDK-Switch Zsh Plugin\n"
-  echo "usage: jdk-switch [-s|--status][-v|--select-version version-code][-h|--help]"
+  echo "usage: jdk-switch [-s|--status][-v|--switch-version code][-c|--scan|scan][-h|--help]"
   echo "       -h,--help                  Display manual page"
   echo "       -s,--status                Display activated jdk status"
-  echo "       -v,--select-version code   Switch to target jdk version"
+  echo "       -v,--switch-version code   Switch to target jdk version"
+  echo "       -c,--scan,scan             Scan homebrew installed jdk and create symbolic links for MacOS"
   echo "       code                       Switch to target jdk version, legacy support"
 }
 
@@ -73,7 +76,6 @@ _jdk_switch_apply_setting() {
   {
     echo "JDK_STATUS=$VERSION_CODE"
     echo "JAVA_HOME=$JAVA_HOME_PATH"
-    echo "CLASSPATH=.:\$JAVA_HOME/lib/tools.jar:\$JAVA_HOME/lib/dt.jar"
     echo "PATH=\$JAVA_HOME/bin:\$PATH"
   } >"$JDK_STATUS_FILE"
 
@@ -89,7 +91,10 @@ _jdk_switch_apply_setting() {
 _jdk_switch_load_config() {
   # create status file and directory if not exist
   [[ ! -d "$JDK_STATUS_FILE_PATH" ]] && mkdir "$JDK_STATUS_FILE_PATH"
-  [[ ! -f "$JDK_STATUS_FILE" ]] && touch "$JDK_STATUS_FILE"
+  if [[ ! -f "$JDK_STATUS_FILE" ]]; then
+    touch "$JDK_STATUS_FILE"
+    _jdk_switch_scan
+  fi
 
   # apply environment variable in JDK_STATUS_FILE
   source "$JDK_STATUS_FILE" && export JAVA_HOME
@@ -129,29 +134,67 @@ _jdk_switch_validate_config() {
   _jdk_switch_search_default && exec zsh
 }
 
-# extract version code from jdk home directory
-_jdk_switch_extract_version_code() {
-  basename "${1}" | sed 's/jdk\|jdk-\|java-\|openjdk\|openjdk-\|\.jdk\|-openjdk-[a-zA-Z0-9_\.\-]*//g'
-}
-
 _jdk_switch_macos_module() {
   MACOS_JDK_DIR=/Library/Java/JavaVirtualMachines
   BREW_EXECUTABLE=brew
 
-  _jdk_switch_if_no_jdk_installed() {
+  # extract version code from jdk home directory
+  _jdk_switch_extract_version_code() {
+    basename "${1}" | sed 's/openjdk@//g;s/[.]*jdk//g'
+  }
+
+  # scan MacOS default jdk directory, remove broken links and create new links for brew installed jdk
+  _jdk_switch_scan() {
+    local JDK_ENTRY
+    # check if MacOS default jdk directory exist and have jdk installed (or sub directories)
+    [[ ! -d $MACOS_JDK_DIR ]] && sudo mkdir -p "$MACOS_JDK_DIR"
+
+    # traverse all sub directory, remove broken links
+    if [[ -n "$(ls "$MACOS_JDK_DIR")" ]]; then
+      for JDK_ENTRY in "$MACOS_JDK_DIR"/*; do
+        if [[ ! -e $JDK_ENTRY ]]; then
+          echo -e "Broken link deleted for $JDK_ENTRY"
+          sudo rm -rf "$JDK_ENTRY"
+        fi
+      done
+    fi
+
+    # if homebrew is installed, check jdk installed by homebrew
+    if command -v $BREW_EXECUTABLE &>/dev/null; then
+      BREW_OPT_DIR="$(brew --prefix)"/opt
+      if [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
+        echo -e "$JS_PLUGIN_NAME: Scanning brew installed jdk"
+        # traverse all brew installed jdk and create symbolic link if not created
+        for JDK_ENTRY in "$BREW_OPT_DIR"/*jdk@*; do
+          JDK_ENTRY_NAME=$(basename "$JDK_ENTRY")
+          JDK_LINK=$MACOS_JDK_DIR/$JDK_ENTRY_NAME
+          JDK_ENTRY_HOME=$JDK_ENTRY/libexec/openjdk.jdk/Contents/Home
+          if [[ ! -L $JDK_LINK ]]; then
+            echo -e "$JS_PLUGIN_NAME: Creating symbolic link from [${Green}$JDK_ENTRY_HOME${NC}] to [${Green}$JDK_LINK${NC}]"
+            sudo ln -s "$JDK_ENTRY_HOME" "$JDK_LINK"
+          else
+            echo -e "$JS_PLUGIN_NAME: Symbolic link [${Green}$JDK_LINK${NC}] already exist"
+          fi
+        done
+      fi
+    fi
+
+  }
+
+  _jdk_switch_check_if_no_jdk_installed() {
     local BREW_JDK_EXIST MACOS_JDK_EXIST
     BREW_JDK_EXIST=false
     MACOS_JDK_EXIST=false
 
     # if homebrew is installed, check jdk installed by homebrew
     if command -v $BREW_EXECUTABLE &>/dev/null; then
-      BREW_CELLAR="$(brew --prefix)"/Cellar
-      if [[ -n "$(ls "$BREW_CELLAR" | grep 'jdk')" ]]; then
+      BREW_OPT_DIR="$(brew --prefix)"/opt
+      if [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
         BREW_JDK_EXIST=true
       fi
     fi
 
-    # check if MacOS default jdk directory exist and have jdk installed
+    # check if MacOS default jdk directory exist and have jdk installed (or sub directories)
     if [[ -d $MACOS_JDK_DIR ]] && [[ -n "$(ls "$MACOS_JDK_DIR")" ]]; then
       MACOS_JDK_EXIST=true
     fi
@@ -164,52 +207,66 @@ _jdk_switch_macos_module() {
 
   # traverse all installed jdk to find a target jdk
   _jdk_switch_traverse_jdk() {
+    local JDK_ENTRY
     # search jdk installed by homebrew first
-    if [[ -n "$BREW_CELLAR" ]] && [[ -n "$(ls "$BREW_CELLAR" | grep 'jdk')" ]]; then
+    if [[ -n "$BREW_OPT_DIR" ]] && [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
       # traverse homebrew jdk list
-      for JDK_ENTRY in "$BREW_CELLAR"/*jdk*; do
+      for JDK_ENTRY in "$BREW_OPT_DIR"/*jdk@*; do
         # incase no version exist in the direcotry
         [[ -z "$(ls "$JDK_ENTRY")" ]] && continue
-        # multiple version might co-exist in the directory
-        for JDK_VERSION in "$JDK_ENTRY"/*; do
-          if [[ -f "$JDK_VERSION/bin/java" ]]; then
-            EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_VERSION")
-            MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f1)
-            if [[ -z $VERSION_CODE ]]; then
-              # if version code not provided, select first version and set JAVA_HOME_PATH
-              JAVA_HOME_PATH=$JDK_VERSION
-              break
-            else
-              # if version code provided, select first matched version and set JAVA_HOME_PATH
-              # need some special treatment for jdk before 9
-              [[ $VERSION_CODE -lt 9 ]] && MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f2)
-              if [[ $MAJOR_VERSION == "$VERSION_CODE" ]]; then
-                JAVA_HOME_PATH=$JDK_VERSION
-                break
-              fi
-            fi
-          fi
-        done
-      done
-    fi
-
-    # if no homebrew jdk found or homebrew not installed, seacrh in MacOS default jdk directory
-    if [[ -z "$JAVA_HOME_PATH" ]]; then
-      for JDK_ENTRY in "$MACOS_JDK_DIR"/*; do
-        if [[ -f "$JDK_ENTRY/Contents/Home/bin/java" ]]; then
-          # compare version code extract from jdk directory
+        # check if directory is a valid jdk directory
+        JDK_ENTRY_HOME=$JDK_ENTRY/libexec/openjdk.jdk/Contents/Home
+        if [[ -f "$JDK_ENTRY_HOME/bin/java" ]]; then
           EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_ENTRY")
           MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f1)
           if [[ -z $VERSION_CODE ]]; then
             # if version code not provided, select first version and set JAVA_HOME_PATH
-            JAVA_HOME_PATH=$JDK_ENTRY/Contents/Home
+            JAVA_HOME_PATH=$JDK_ENTRY_HOME
             break
           else
             # if version code provided, select first matched version and set JAVA_HOME_PATH
             # need some special treatment for jdk before 9
             [[ $VERSION_CODE -lt 9 ]] && MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f2)
             if [[ $MAJOR_VERSION == "$VERSION_CODE" ]]; then
-              JAVA_HOME_PATH=$JDK_ENTRY/Contents/Home
+              JAVA_HOME_PATH=$JDK_ENTRY_HOME
+              break
+            fi
+          fi
+        fi
+      done
+      # if a brew installed jdk selected, create a link to MacOS default jdk directory
+      if [[ -n "$JAVA_HOME_PATH" ]]; then
+        JDK_ENTRY_NAME=$(basename "$JDK_ENTRY")
+        JDK_LINK=$MACOS_JDK_DIR/$JDK_ENTRY_NAME
+        if [[ ! -L "$JDK_LINK" ]]; then
+          echo -e "$JS_PLUGIN_NAME: Creating symbolic link for [${Green}$JAVA_HOME_PATH${NC}] at [${Green}$JDK_LINK${NC}]"
+          echo -e "$JS_PLUGIN_NAME: This operation need system admin permission"
+          sudo ln -s "$JAVA_HOME_PATH" "$JDK_LINK"
+        fi
+      fi
+    fi
+
+    # if no homebrew jdk found or homebrew not installed, seacrh in MacOS default jdk directory
+    if [[ -z "$JAVA_HOME_PATH" ]]; then
+      for JDK_ENTRY in "$MACOS_JDK_DIR"/*; do
+        # ignore symbolic link
+        [[ -L $JDK_ENTRY ]] && continue
+        # check if directory is a valid jdk directory
+        JDK_ENTRY_HOME=$JDK_ENTRY/Contents/Home
+        if [[ -f "$JDK_ENTRY_HOME/bin/java" ]]; then
+          # compare version code extract from jdk directory
+          EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_ENTRY")
+          MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f1)
+          if [[ -z $VERSION_CODE ]]; then
+            # if version code not provided, select first version and set JAVA_HOME_PATH
+            JAVA_HOME_PATH=$JDK_ENTRY_HOME
+            break
+          else
+            # if version code provided, select first matched version and set JAVA_HOME_PATH
+            # need some special treatment for jdk before 9
+            [[ $VERSION_CODE -lt 9 ]] && MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f2)
+            if [[ $MAJOR_VERSION == "$VERSION_CODE" ]]; then
+              JAVA_HOME_PATH=$JDK_ENTRY_HOME
               break
             fi
           fi
@@ -224,7 +281,7 @@ _jdk_switch_macos_module() {
     VERSION_CODE=${1}
 
     # check jdk directory incase no jdk is installed
-    _jdk_switch_if_no_jdk_installed || return 1
+    _jdk_switch_check_if_no_jdk_installed || return 1
 
     # traverse all jdk to select a target jdk
     _jdk_switch_traverse_jdk "$VERSION_CODE"
@@ -242,7 +299,7 @@ _jdk_switch_macos_module() {
   # search installed jdk and apply the first located one as default
   _jdk_switch_search_default() {
     # check jdk directory incase no jdk is installed
-    _jdk_switch_if_no_jdk_installed || return 1
+    _jdk_switch_check_if_no_jdk_installed || return 1
 
     # traverse all jdk to select a target jdk
     _jdk_switch_traverse_jdk "$VERSION_CODE"
@@ -257,6 +314,15 @@ _jdk_switch_macos_module() {
 
 _jdk_switch_linux_module() {
   LINUX_JDK_DIR="/usr/lib/jvm"
+
+  # extract version code from jdk home directory
+  _jdk_switch_extract_version_code() {
+    basename "${1}" | sed 's/jdk\|jdk-\|java-\|openjdk\|openjdk-\|openjdk@\|\.jdk\|-openjdk-[a-zA-Z0-9_\.\-]*//g'
+  }
+
+  _jdk_switch_scan() {
+    echo -e "$JS_PLUGIN_NAME: This utility is MacOS exclusive."
+  }
 
   # traverse all installed jdk to find a target jdk
   _jdk_switch_traverse_jdk() {
