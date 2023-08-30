@@ -10,6 +10,7 @@ _jdk_switch_load_env() {
 
   Red='\033[1;31m'
   Blue='\033[1;34m'
+  Green='\033[1;32m'
   NC='\033[0m'
 
   JS_PLUGIN_NAME="JDK-SWITCH"
@@ -138,6 +139,39 @@ _jdk_switch_macos_module() {
     basename "${1}" | sed 's/openjdk@//g;s/[.]*jdk//g'
   }
 
+  # scan MacOS default jdk directory, remove broken links and create new links for brew installed jdk
+  _jdk_switch_scan() {
+    local JDK_ENTRY
+    # check if MacOS default jdk directory exist and have jdk installed (or sub directories)
+    [[ ! -d $MACOS_JDK_DIR ]] && sudo mkdir -p "$MACOS_JDK_DIR"
+
+    # traverse all sub directory, remove broken links
+    if [[ -n "$(ls "$MACOS_JDK_DIR")" ]]; then
+      for JDK_ENTRY in "$MACOS_JDK_DIR"/*; do
+        if [[ ! -e $JDK_ENTRY ]]; then
+          echo -e "Broken link deleted for $JDK_ENTRY"
+          sudo rm -rf "$JDK_ENTRY"
+        fi
+      done
+    fi
+
+    # if homebrew is installed, check jdk installed by homebrew
+    if command -v $BREW_EXECUTABLE &>/dev/null; then
+      BREW_OPT_DIR="$(brew --prefix)"/opt
+      if [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
+        for JDK_ENTRY in "$BREW_OPT_DIR"/*jdk*; do
+          JDK_ENTRY_NAME=$(basename "$JDK_ENTRY")
+          JDK_LINK=$MACOS_JDK_DIR/$JDK_ENTRY_NAME
+          if [[ ! -L $JDK_LINK ]]; then
+            echo -e "$JS_PLUGIN_NAME: Creating symbolic link from [${Green}$JDK_ENTRY${NC}] to [${Green}$JDK_LINK${NC}]"
+            sudo ln -s "$JDK_ENTRY" "$JDK_LINK"
+          fi
+        done
+      fi
+    fi
+
+  }
+
   _jdk_switch_check_if_no_jdk_installed() {
     local BREW_JDK_EXIST MACOS_JDK_EXIST
     BREW_JDK_EXIST=false
@@ -151,7 +185,7 @@ _jdk_switch_macos_module() {
       fi
     fi
 
-    # check if MacOS default jdk directory exist and have jdk installed
+    # check if MacOS default jdk directory exist and have jdk installed (or sub directories)
     if [[ -d $MACOS_JDK_DIR ]] && [[ -n "$(ls "$MACOS_JDK_DIR")" ]]; then
       MACOS_JDK_EXIST=true
     fi
@@ -164,6 +198,7 @@ _jdk_switch_macos_module() {
 
   # traverse all installed jdk to find a target jdk
   _jdk_switch_traverse_jdk() {
+    local JDK_ENTRY
     # search jdk installed by homebrew first
     if [[ -n "$BREW_OPT_DIR" ]] && [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
       # traverse homebrew jdk list
@@ -190,6 +225,16 @@ _jdk_switch_macos_module() {
           fi
         fi
       done
+      # if a brew installed jdk selected, create a link to MacOS default jdk directory
+      if [[ -n "$JAVA_HOME_PATH" ]]; then
+        JDK_ENTRY_NAME=$(basename "$JDK_ENTRY")
+        JDK_LINK=$MACOS_JDK_DIR/$JDK_ENTRY_NAME
+        if [[ ! -L "$JDK_LINK" ]]; then
+          echo -e "$JS_PLUGIN_NAME: Creating symbolic link from [${Green}$JDK_ENTRY${NC}] to [${Green}$JDK_LINK${NC}]"
+          echo -e "$JS_PLUGIN_NAME: This operation need system admin permission"
+          sudo ln -s "$JDK_ENTRY" "$JDK_LINK"
+        fi
+      fi
     fi
 
     # if no homebrew jdk found or homebrew not installed, seacrh in MacOS default jdk directory
