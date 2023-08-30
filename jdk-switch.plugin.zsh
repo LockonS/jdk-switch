@@ -129,24 +129,24 @@ _jdk_switch_validate_config() {
   _jdk_switch_search_default && exec zsh
 }
 
-# extract version code from jdk home directory
-_jdk_switch_extract_version_code() {
-  basename "${1}" | sed 's/jdk\|jdk-\|java-\|openjdk\|openjdk-\|\.jdk\|-openjdk-[a-zA-Z0-9_\.\-]*//g'
-}
-
 _jdk_switch_macos_module() {
   MACOS_JDK_DIR=/Library/Java/JavaVirtualMachines
   BREW_EXECUTABLE=brew
 
-  _jdk_switch_if_no_jdk_installed() {
+  # extract version code from jdk home directory
+  _jdk_switch_extract_version_code() {
+    basename "${1}" | sed 's/openjdk@//g;s/[.]*jdk//g'
+  }
+
+  _jdk_switch_check_if_no_jdk_installed() {
     local BREW_JDK_EXIST MACOS_JDK_EXIST
     BREW_JDK_EXIST=false
     MACOS_JDK_EXIST=false
 
     # if homebrew is installed, check jdk installed by homebrew
     if command -v $BREW_EXECUTABLE &>/dev/null; then
-      BREW_CELLAR="$(brew --prefix)"/Cellar
-      if [[ -n "$(ls "$BREW_CELLAR" | grep 'jdk')" ]]; then
+      BREW_OPT_DIR="$(brew --prefix)"/opt
+      if [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
         BREW_JDK_EXIST=true
       fi
     fi
@@ -165,51 +165,51 @@ _jdk_switch_macos_module() {
   # traverse all installed jdk to find a target jdk
   _jdk_switch_traverse_jdk() {
     # search jdk installed by homebrew first
-    if [[ -n "$BREW_CELLAR" ]] && [[ -n "$(ls "$BREW_CELLAR" | grep 'jdk')" ]]; then
+    if [[ -n "$BREW_OPT_DIR" ]] && [[ -n "$(ls "$BREW_OPT_DIR" | grep 'jdk')" ]]; then
       # traverse homebrew jdk list
-      for JDK_ENTRY in "$BREW_CELLAR"/*jdk*; do
+      for JDK_ENTRY in "$BREW_OPT_DIR"/*jdk*; do
         # incase no version exist in the direcotry
         [[ -z "$(ls "$JDK_ENTRY")" ]] && continue
         # multiple version might co-exist in the directory
-        for JDK_VERSION in "$JDK_ENTRY"/*; do
-          if [[ -f "$JDK_VERSION/bin/java" ]]; then
-            EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_VERSION")
-            MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f1)
-            if [[ -z $VERSION_CODE ]]; then
-              # if version code not provided, select first version and set JAVA_HOME_PATH
-              JAVA_HOME_PATH=$JDK_VERSION
-              break
-            else
-              # if version code provided, select first matched version and set JAVA_HOME_PATH
-              # need some special treatment for jdk before 9
-              [[ $VERSION_CODE -lt 9 ]] && MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f2)
-              if [[ $MAJOR_VERSION == "$VERSION_CODE" ]]; then
-                JAVA_HOME_PATH=$JDK_VERSION
-                break
-              fi
-            fi
-          fi
-        done
-      done
-    fi
-
-    # if no homebrew jdk found or homebrew not installed, seacrh in MacOS default jdk directory
-    if [[ -z "$JAVA_HOME_PATH" ]]; then
-      for JDK_ENTRY in "$MACOS_JDK_DIR"/*; do
-        if [[ -f "$JDK_ENTRY/Contents/Home/bin/java" ]]; then
-          # compare version code extract from jdk directory
+        JDK_ENTRY_HOME=$JDK_ENTRY/libexec/openjdk.jdk/Contents/Home
+        if [[ -f "$JDK_ENTRY_HOME/bin/java" ]]; then
           EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_ENTRY")
           MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f1)
           if [[ -z $VERSION_CODE ]]; then
             # if version code not provided, select first version and set JAVA_HOME_PATH
-            JAVA_HOME_PATH=$JDK_ENTRY/Contents/Home
+            JAVA_HOME_PATH=$JDK_ENTRY_HOME
             break
           else
             # if version code provided, select first matched version and set JAVA_HOME_PATH
             # need some special treatment for jdk before 9
             [[ $VERSION_CODE -lt 9 ]] && MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f2)
             if [[ $MAJOR_VERSION == "$VERSION_CODE" ]]; then
-              JAVA_HOME_PATH=$JDK_ENTRY/Contents/Home
+              JAVA_HOME_PATH=$JDK_ENTRY_HOME
+              break
+            fi
+          fi
+        fi
+      done
+    fi
+
+    # if no homebrew jdk found or homebrew not installed, seacrh in MacOS default jdk directory
+    if [[ -z "$JAVA_HOME_PATH" ]]; then
+      for JDK_ENTRY in "$MACOS_JDK_DIR"/*; do
+        JDK_ENTRY_HOME=$JDK_ENTRY/Contents/Home
+        if [[ -f "$JDK_ENTRY_HOME/bin/java" ]]; then
+          # compare version code extract from jdk directory
+          EXTRACT_VERSION_CODE=$(_jdk_switch_extract_version_code "$JDK_ENTRY")
+          MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f1)
+          if [[ -z $VERSION_CODE ]]; then
+            # if version code not provided, select first version and set JAVA_HOME_PATH
+            JAVA_HOME_PATH=$JDK_ENTRY_HOME
+            break
+          else
+            # if version code provided, select first matched version and set JAVA_HOME_PATH
+            # need some special treatment for jdk before 9
+            [[ $VERSION_CODE -lt 9 ]] && MAJOR_VERSION=$(echo "$EXTRACT_VERSION_CODE" | cut -d. -f2)
+            if [[ $MAJOR_VERSION == "$VERSION_CODE" ]]; then
+              JAVA_HOME_PATH=$JDK_ENTRY_HOME
               break
             fi
           fi
@@ -224,7 +224,7 @@ _jdk_switch_macos_module() {
     VERSION_CODE=${1}
 
     # check jdk directory incase no jdk is installed
-    _jdk_switch_if_no_jdk_installed || return 1
+    _jdk_switch_check_if_no_jdk_installed || return 1
 
     # traverse all jdk to select a target jdk
     _jdk_switch_traverse_jdk "$VERSION_CODE"
@@ -242,7 +242,7 @@ _jdk_switch_macos_module() {
   # search installed jdk and apply the first located one as default
   _jdk_switch_search_default() {
     # check jdk directory incase no jdk is installed
-    _jdk_switch_if_no_jdk_installed || return 1
+    _jdk_switch_check_if_no_jdk_installed || return 1
 
     # traverse all jdk to select a target jdk
     _jdk_switch_traverse_jdk "$VERSION_CODE"
@@ -257,6 +257,11 @@ _jdk_switch_macos_module() {
 
 _jdk_switch_linux_module() {
   LINUX_JDK_DIR="/usr/lib/jvm"
+
+  # extract version code from jdk home directory
+  _jdk_switch_extract_version_code() {
+    basename "${1}" | sed 's/jdk\|jdk-\|java-\|openjdk\|openjdk-\|openjdk@\|\.jdk\|-openjdk-[a-zA-Z0-9_\.\-]*//g'
+  }
 
   # traverse all installed jdk to find a target jdk
   _jdk_switch_traverse_jdk() {
