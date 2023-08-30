@@ -139,7 +139,7 @@ _jdk_switch_macos_module() {
 
   # extract version code from jdk home directory
   _jdk_switch_extract_version_code() {
-    basename "${1}" | sed 's/openjdk@//g;s/[.]*jdk//g'
+    basename "${1}" | sed 's/openjdk[@-_]*//g;s/[.]*jdk[-]*//g'
   }
 
   # scan MacOS default jdk directory, remove broken links and create new links for brew installed jdk
