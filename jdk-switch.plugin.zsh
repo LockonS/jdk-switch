@@ -8,6 +8,7 @@ _jdk_switch_load_env() {
   JDK_STATUS_FILE_PATH=$JDK_SWITCH_SCRIPT_PATH/status
   JDK_STATUS_FILE=$JDK_STATUS_FILE_PATH/jdk_status
 
+  Blue='\033[0;34m'
   BRed='\033[1;31m'
   BBlue='\033[1;34m'
   BGreen='\033[1;32m'
@@ -58,7 +59,7 @@ _jdk_switch_help_page() {
 
 # update jdk-switch plugin
 _jdk_switch_plugin_update() {
-  echo -e "${BBlue}Updating jdk-switch plugin${NC}"
+  echo -e "${Blue}Updating jdk-switch plugin${NC}"
   git -C "$JDK_SWITCH_SCRIPT_PATH" stash
   git -C "$JDK_SWITCH_SCRIPT_PATH" pull
   exec zsh
@@ -72,7 +73,7 @@ _jdk_switch_load_by_os() {
   elif [[ $OSNAME == LINUX* ]]; then
     _jdk_switch_linux_module
   else
-    echo "Unsupported OS, exiting"
+    echo -e "${BRed}${JS_PLUGIN_NAME}: Unsupported OS, exiting${NC}"
   fi
 }
 
@@ -398,7 +399,6 @@ _jdk_switch_linux_module() {
     fi
 
   }
-
 }
 
 alias jdkswitch='jdk-switch'
