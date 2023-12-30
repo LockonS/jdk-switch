@@ -8,9 +8,9 @@ _jdk_switch_load_env() {
   JDK_STATUS_FILE_PATH=$JDK_SWITCH_SCRIPT_PATH/status
   JDK_STATUS_FILE=$JDK_STATUS_FILE_PATH/jdk_status
 
-  Red='\033[1;31m'
-  Blue='\033[1;34m'
-  Green='\033[1;32m'
+  BRed='\033[1;31m'
+  BBlue='\033[1;34m'
+  BGreen='\033[1;32m'
   NC='\033[0m'
 
   JS_PLUGIN_NAME="JDK-SWITCH"
@@ -19,9 +19,10 @@ _jdk_switch_load_env() {
 jdk-switch() {
   local PARAM=$1
   case $PARAM in
-    -s | --status) jdk-status ;;
-    -h | --help) _jdk_switch_help_page ;;
-    -v | --switch-version) _jdk_switch_switch_jdk "${2}" ;;
+    -s | --status | status) jdk-status ;;
+    -h | --help | help) _jdk_switch_help_page ;;
+    -u | --update | update) _jdk_switch_plugin_update ;;
+    -v | --switch | switch) _jdk_switch_switch_jdk "${2}" ;;
     -c | --scan | scan) _jdk_switch_scan ;;
     *) _jdk_switch_switch_jdk "${1}" ;;
   esac
@@ -34,7 +35,7 @@ jdk-switch-enable() {
 # display jdk status
 jdk-status() {
   if [[ -z $JDK_STATUS ]]; then
-    echo -e "${Red}${JS_PLUGIN_NAME}: JDK status unknown${NC}"
+    echo -e "${BRed}${JS_PLUGIN_NAME}: JDK status unknown${NC}"
   else
     echo "JAVA_HOME: $JAVA_HOME"
     java -version
@@ -43,13 +44,24 @@ jdk-status() {
 
 # display help page and info
 _jdk_switch_help_page() {
-  echo -e "JDK-Switch Zsh Plugin\n"
-  echo "usage: jdk-switch [-s|--status][-v|--switch-version code][-c|--scan|scan][-h|--help]"
-  echo "       -h,--help                  Display manual page"
-  echo "       -s,--status                Display activated jdk status"
-  echo "       -v,--switch-version code   Switch to target jdk version"
-  echo "       -c,--scan,scan             Scan homebrew installed jdk and create symbolic links for MacOS"
-  echo "       code                       Switch to target jdk version, legacy support"
+  echo -e "jdk-switch zsh plugin\n"
+  echo "usage: jdk-switch [-s|--status][-u|--update][-v|--switch code][-c|--scan|scan][-h|--help]"
+  echo "       -h, --help, help               Display manual page"
+  echo "       -s, --status, status           Display activated jdk status"
+  echo "       -u, --update, update           Update jdk-switch plugin with git"
+  echo "       -v, --switch, switch  code     Switch to target jdk version"
+  if [[ $OSNAME == DARWIN* ]]; then
+    echo "       -c, --scan, scan               Scan homebrew installed jdk and create symbolic links for MacOS"
+  fi
+  echo "       code                           Switch to target jdk version, legacy support"
+}
+
+# update jdk-switch plugin
+_jdk_switch_plugin_update() {
+  echo -e "${BBlue}Updating jdk-switch plugin${NC}"
+  git -C "$JDK_SWITCH_SCRIPT_PATH" stash
+  git -C "$JDK_SWITCH_SCRIPT_PATH" pull
+  exec zsh
 }
 
 # load different function based on os type
@@ -79,7 +91,7 @@ _jdk_switch_apply_setting() {
   } >"$JDK_STATUS_FILE"
 
   # print remind message if jdk was found and activated
-  [[ -n $INIT_MODE ]] && echo -e "$JS_PLUGIN_NAME: Activate jdk ${Blue}${VERSION_CODE}${NC} as default jdk.\nReloading shell..."
+  [[ -n $INIT_MODE ]] && echo -e "$JS_PLUGIN_NAME: Activate jdk ${BBlue}${VERSION_CODE}${NC} as default jdk.\nReloading shell..."
 
   # print jdk version and reload shell
   "$JAVA_HOME_PATH/bin/java" -version
@@ -107,16 +119,16 @@ _jdk_switch_load_config() {
 
 _jdk_switch_msg_no_target_version() {
   local VERSION_CODE=${1}
-  echo -e "${Red}$JS_PLUGIN_NAME: Target version ${VERSION_CODE} not found ${NC}"
+  echo -e "${BRed}$JS_PLUGIN_NAME: Target version ${VERSION_CODE} not found ${NC}"
 }
 
 _jdk_switch_msg_switch_version() {
   local VERSION_CODE=${1}
-  echo -e "$JS_PLUGIN_NAME: Switch to jdk ${Blue}${VERSION_CODE}${NC}"
+  echo -e "$JS_PLUGIN_NAME: Switch to jdk ${BBlue}${VERSION_CODE}${NC}"
 }
 
 _jdk_switch_msg_no_jdk_installed() {
-  echo -e "${Red}${JS_PLUGIN_NAME}: No JDK found on this machine${NC}"
+  echo -e "${BRed}${JS_PLUGIN_NAME}: No JDK found on this machine${NC}"
 }
 
 # validate saved setting in case of empty or corrupted, in that case search an installed jdk and set as default
@@ -169,10 +181,10 @@ _jdk_switch_macos_module() {
           JDK_LINK=$MACOS_JDK_DIR/$JDK_ENTRY_NAME
           JDK_ENTRY_HOME=$JDK_ENTRY/libexec/openjdk.jdk/Contents/Home
           if [[ ! -L $JDK_LINK ]]; then
-            echo -e "$JS_PLUGIN_NAME: Creating symbolic link from [${Green}$JDK_ENTRY_HOME${NC}] to [${Green}$JDK_LINK${NC}]"
+            echo -e "$JS_PLUGIN_NAME: Creating symbolic link from [${BGreen}$JDK_ENTRY_HOME${NC}] to [${BGreen}$JDK_LINK${NC}]"
             sudo ln -s "$JDK_ENTRY_HOME" "$JDK_LINK"
           else
-            echo -e "$JS_PLUGIN_NAME: Symbolic link [${Green}$JDK_LINK${NC}] already exist"
+            echo -e "$JS_PLUGIN_NAME: Symbolic link [${BGreen}$JDK_LINK${NC}] already exist"
           fi
         done
       fi
@@ -238,7 +250,7 @@ _jdk_switch_macos_module() {
         JDK_ENTRY_NAME=$(basename "$JDK_ENTRY")
         JDK_LINK=$MACOS_JDK_DIR/$JDK_ENTRY_NAME
         if [[ ! -L "$JDK_LINK" ]]; then
-          echo -e "$JS_PLUGIN_NAME: Creating symbolic link for [${Green}$JAVA_HOME_PATH${NC}] at [${Green}$JDK_LINK${NC}]"
+          echo -e "$JS_PLUGIN_NAME: Creating symbolic link for [${BGreen}$JAVA_HOME_PATH${NC}] at [${BGreen}$JDK_LINK${NC}]"
           echo -e "$JS_PLUGIN_NAME: This operation need system admin permission"
           sudo ln -s "$JAVA_HOME_PATH" "$JDK_LINK"
         fi
@@ -320,7 +332,7 @@ _jdk_switch_linux_module() {
   }
 
   _jdk_switch_scan() {
-    echo -e "$JS_PLUGIN_NAME: This utility is MacOS exclusive."
+    echo -e "$JS_PLUGIN_NAME: This command is not available on Linux."
   }
 
   # traverse all installed jdk to find a target jdk
