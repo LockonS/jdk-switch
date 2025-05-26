@@ -409,7 +409,6 @@ _jdk_switch_load_by_os
 _jdk_switch_load_config
 _jdk_switch_validate_config
 
-unset JDK_SWITCH_SCRIPT_PATH
 unset JDK_STATUS_FILE_PATH
 unfunction _jdk_switch_load_env
 unfunction _jdk_switch_load_by_os
