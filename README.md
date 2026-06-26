@@ -28,7 +28,10 @@ A zsh plugin for quickly switching between different jdk versions, and the jdk s
 	
 	# use 6,7,8 for jdk before jdk9
 	$ jdk-switch -v 8
-	
+
+	# switch jdk only in current shell session (no file update, no shell reload)
+	$ jdk-switch --session-only -v 21
+
 	# check activating jdk status
 	$ jdk-status
  
@@ -39,6 +42,9 @@ A zsh plugin for quickly switching between different jdk versions, and the jdk s
 	
 #### Notice
 
-1. This plugin works as a tiny tool to help you switch between different jdk versions by writing the jdk version you are currently using to a file and **reloading the shell itself**, so the setting would not be affected if you reload your shell and no additional useless part would show up in `PATH`. And that's also the original purpose of this plugin. 
+1. This plugin works as a tiny tool to help you switch between different jdk versions by writing the jdk version you are currently using to a file and **reloading the shell itself**, so the setting would not be affected if you reload your shell and no additional useless part would show up in `PATH`. And that's also the original purpose of this plugin.
 
-2. This plugin manages the environment variable like `PATH`, `JAVA_HOME`, so be cautious while changing these variables in your `~/.zshrc` or anywhere else, especially when adding settings about configuring the java environment which has something to do with any of these variables, as the plugin setting might be overridden by your own setting.
+2. Use `--session-only` flag to switch JDK only in the current shell session without updating the saved configuration or reloading the shell. This is useful for temporary version switching in scripts or one-off tasks. The change will be lost once the session ends or the shell is reloaded.
+
+3. This plugin manages the environment variable like `PATH`, `JAVA_HOME`, so be cautious while changing these variables in your `~/.zshrc` or anywhere else, especially when adding settings about configuring the java environment which has something to do with any of these variables, as the plugin setting might be overridden by your own setting.
+
