@@ -12,21 +12,53 @@ _jdk_switch_load_env() {
   BRed='\033[1;31m'
   BBlue='\033[1;34m'
   BGreen='\033[1;32m'
+  BYellow='\033[1;33m'
   NC='\033[0m'
 
   JS_PLUGIN_NAME="JDK-SWITCH"
 }
 
 jdk-switch() {
-  local PARAM=$1
-  case $PARAM in
-    -s | --status | status) jdk-status ;;
-    -h | --help | help) _jdk_switch_help_page ;;
-    -u | --update | update) _jdk_switch_plugin_update ;;
-    -v | --switch | switch) _jdk_switch_switch_jdk "${2}" ;;
-    -c | --scan | scan) _jdk_switch_scan ;;
-    *) _jdk_switch_switch_jdk "${1}" ;;
-  esac
+  local TARGET_JDK_VERSION SESSION_ONLY
+  SESSION_ONLY=false
+
+  # add legacy support for jdk-switch ${version}
+  _jdk_switch_parse_raw_input "${1}"
+
+  while [ $# -gt 0 ]; do
+    case ${1} in
+      '-h' | '--help')
+        _jdk_switch_help_page
+        exit 0
+        ;;
+      '-s' | '--status' | 'status')
+        jdk-status
+        exit 0
+        ;;
+      '-u' | '--update' | 'update')
+        _jdk_switch_plugin_update
+        exit 0
+        ;;
+      '-c' | '--scan' | 'scan')
+        _jdk_switch_scan
+        exit 0
+        ;;
+      '-so' | '--session-only')
+        SESSION_ONLY=true
+        shift
+        ;;
+      '-v' | '--switch' | 'switch')
+        TARGET_JDK_VERSION="${2}"
+        shift
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  _jdk_switch_switch_jdk "${TARGET_JDK_VERSION}" "${SESSION_ONLY}"
 }
 
 jdk-switch-enable() {
@@ -46,11 +78,12 @@ jdk-status() {
 # display help page and info
 _jdk_switch_help_page() {
   echo -e "jdk-switch zsh plugin\n"
-  echo "usage: jdk-switch [-s|--status][-u|--update][-v|--switch code][-c|--scan|scan][-h|--help]"
+  echo "usage: jdk-switch [-s|--status][-u|--update][-v|--switch code][-c|--scan|scan][-so|--session-only][-h|--help]"
   echo "       -h, --help, help               Display manual page"
   echo "       -s, --status, status           Display activated jdk status"
   echo "       -u, --update, update           Update jdk-switch plugin with git"
-  echo "       -v, --switch, switch  code     Switch to target jdk version"
+  echo "       -v, --switch, switch   code    Switch to target jdk version"
+  echo "       -so,--session-only             Switch only in current shell session (no reload required)"
   if [[ $OSNAME == DARWIN* ]]; then
     echo "       -c, --scan, scan               Scan homebrew installed jdk and create symbolic links for MacOS"
   fi
@@ -125,7 +158,12 @@ _jdk_switch_msg_no_target_version() {
 
 _jdk_switch_msg_switch_version() {
   local VERSION_CODE=${1}
-  echo -e "$JS_PLUGIN_NAME: Switch to jdk ${BBlue}${VERSION_CODE}${NC}"
+  local SESSION_ONLY=${2}
+  local PROMPT_MSG="$JS_PLUGIN_NAME: Switch to jdk ${BBlue}${VERSION_CODE}${NC}"
+  if [[ $SESSION_ONLY == true ]]; then
+    PROMPT_MSG+=" [${BYellow}session-only${NC}]"
+  fi
+  echo -e "$PROMPT_MSG"
 }
 
 _jdk_switch_msg_no_jdk_installed() {
@@ -139,11 +177,32 @@ _jdk_switch_validate_config() {
   # if jdk was upgraded in minor version, use previous version to inherit the major version
   if [[ -n $JDK_PREVIOUS_VERSION ]]; then
     # if the major version exist, exit the process with success, else search and apply the default jdk
-    _jdk_switch_switch_jdk "$JDK_PREVIOUS_VERSION" && return 0
+    _jdk_switch_switch_jdk "${JDK_PREVIOUS_VERSION}" && return 0
   fi
 
   # reload environment only if search operation complete with success
   _jdk_switch_search_default && exec zsh
+}
+
+_jdk_switch_parse_raw_input() {
+  local RAW_INPUT=${1}
+  local TARGET_JDK_VERSION
+
+  # Check if input is a valid version code (e.g., "7", "17", "21", "17.2", "21.1")
+  if [[ $RAW_INPUT =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+    TARGET_JDK_VERSION="$RAW_INPUT"
+  else
+    # Extract version code from more complex input (e.g., "jdk-17", "openjdk@21")
+    TARGET_JDK_VERSION=$(echo "$RAW_INPUT" | grep -oE '[0-9]+(\.[0-9]+)?(\.[0-9]+)?')
+  fi
+
+  if [[ -n $TARGET_JDK_VERSION ]]; then
+    # apply the extracted version code to TARGET_JDK_VERSION, start execute here
+    echo -e "$JS_PLUGIN_NAME: Apply extracted JDK version: ${BBlue}${TARGET_JDK_VERSION}${NC}"
+    _jdk_switch_switch_jdk "${TARGET_JDK_VERSION}"
+    return 0
+  fi
+
 }
 
 _jdk_switch_macos_module() {
@@ -289,8 +348,9 @@ _jdk_switch_macos_module() {
 
   # search for jdk with designated version code
   _jdk_switch_switch_jdk() {
-    local VERSION_CODE JAVA_HOME_PATH EXTRACT_VERSION_CODE MAJOR_VERSION
+    local VERSION_CODE SESSION_ONLY JAVA_HOME_PATH EXTRACT_VERSION_CODE MAJOR_VERSION
     VERSION_CODE=${1}
+    SESSION_ONLY=${2:-false}
 
     # check jdk directory incase no jdk is installed
     _jdk_switch_check_if_no_jdk_installed || return 1
@@ -299,8 +359,14 @@ _jdk_switch_macos_module() {
     _jdk_switch_traverse_jdk "$VERSION_CODE"
 
     if [[ -n $JAVA_HOME_PATH ]]; then
-      _jdk_switch_msg_switch_version "$VERSION_CODE"
-      _jdk_switch_apply_setting "$VERSION_CODE" "$JAVA_HOME_PATH"
+      _jdk_switch_msg_switch_version "$VERSION_CODE" "$SESSION_ONLY"
+      if [[ $SESSION_ONLY == true ]]; then
+        export JAVA_HOME="$JAVA_HOME_PATH"
+        export PATH="$JAVA_HOME/bin:$PATH"
+        "$JAVA_HOME_PATH/bin/java" -version
+      else
+        _jdk_switch_apply_setting "$VERSION_CODE" "$JAVA_HOME_PATH"
+      fi
     else
       # show error message if not in init mode
       _jdk_switch_msg_no_target_version "$VERSION_CODE"
@@ -359,8 +425,9 @@ _jdk_switch_linux_module() {
 
   # search for jdk with designated version code
   _jdk_switch_switch_jdk() {
-    local VERSION_CODE JAVA_HOME_PATH EXTRACT_VERSION_CODE
+    local VERSION_CODE SESSION_ONLY JAVA_HOME_PATH EXTRACT_VERSION_CODE
     VERSION_CODE=${1}
+    SESSION_ONLY=${2:-false}
 
     if [[ ! -d $LINUX_JDK_DIR ]] || [[ -z "$(ls -A $LINUX_JDK_DIR)" ]]; then
       _jdk_switch_msg_no_jdk_installed
@@ -372,8 +439,14 @@ _jdk_switch_linux_module() {
 
     # if a target jdk is matched
     if [[ -n $JAVA_HOME_PATH ]]; then
-      _jdk_switch_msg_switch_version "$VERSION_CODE"
-      _jdk_switch_apply_setting "$VERSION_CODE" "$JAVA_HOME_PATH"
+      _jdk_switch_msg_switch_version "$VERSION_CODE" "$SESSION_ONLY"
+      if [[ $SESSION_ONLY == true ]]; then
+        export JAVA_HOME="$JAVA_HOME_PATH"
+        export PATH="$JAVA_HOME/bin:$PATH"
+        "$JAVA_HOME_PATH/bin/java" -version
+      else
+        _jdk_switch_apply_setting "$VERSION_CODE" "$JAVA_HOME_PATH"
+      fi
     else
       # show error message if no matched version found
       _jdk_switch_msg_no_target_version "$VERSION_CODE"
@@ -412,3 +485,4 @@ _jdk_switch_validate_config
 unset JDK_STATUS_FILE_PATH
 unfunction _jdk_switch_load_env
 unfunction _jdk_switch_load_by_os
+
